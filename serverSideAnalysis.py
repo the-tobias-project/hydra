@@ -99,11 +99,11 @@ class ServerTalker(object):
       elif subtask == "COUNT":
         self.store_counts(message)
         print("Count statistics have been initialized!")
-    if self.task == "QC":
-      self.server.run_QC()
-    if self.task == "PCA":
+    elif self.task == "QC":
+      self.QC_filters(message["SUBTASK"], message["VALS"])
+    elif self.task == "PCA":
       if self.subtask == "FILTERS":
-        self.server.run_pca()
+        self.PCA_filters(message["FILTERS"], message["VALS"])
         self.counter = self.connections
         self.r0      = 0
         return
@@ -152,7 +152,7 @@ class ServerTalker(object):
         self.status = "INIT STATS"
         self.report_status()
         self.count_stats()
-        self.task = "QC"
+        self.server.run_QC()
   
   def count_stats(self):
     N = float(self.store.attrs["N"])
@@ -205,18 +205,25 @@ class ServerTalker(object):
       if prefix is None: 
         pos_vals, counts_vals, mr_vals = pos.value[tokeep], counts.value[tokeep], mr.value[tokeep]
         del group["positions"], group["counts"], group["missing_rates"]
-        group.create_dataset("positions", data=pos_vals)
-        group.create_dataset("counts", data=counts_vals)
-        group.create_dataset("missing_rates", data=mr_vals)
+        d1 = group.require_dataset("positions", pos_vals.shape, dtype = pos_vals.dtype)
+        d1[:] = pos_vals
+        d2 = group.require_dataset("counts", counts_vals.shape, dtype=counts_vals.dtype)
+        d2[:] = counts_vals
+        d3 = group.require_dataset("missing_rates", mr_vals.shape, dtype=mr_vals.dtype)
+        d3[:] = mr_vals
         del pos_vals, counts_vals, mr_vals
         af_vals, hwe_vals= af.value[tokeep], hwe.value[tokeep]
         del group["hwe"], group["allele_freq"]
-        group.create_dataset("hwe", data=hwe_vals)
-        group.create_dataset("allele_freq", data=af_vals)
+        d4 = group.require_dataset("hwe", hwe_vals.shape, dtype=hwe_vals.dtype)
+        d4[:] = hwe_vals
+        d5 = group.require_dataset("allele_freq",af_vals.shape, dtype=af_vals.dtype)
+        d5[:] = af_vals
+
       else:
-        group.create_dataset(prefix + "passed", data=tokeep)
-      self.task = "PCA"
-      self.subtask = "FILTERS"
+        d1 = group.require_dataset(prefix + "passed", tokeep.shape, dtype=bool)
+        d1[:] = tokeep
+      #self.task = "PCA"
+      #self.subtask = "FILTERS"
 
 
 # PCA stuff 
@@ -304,6 +311,7 @@ class ServerTalker(object):
     for chrom in chroms: 
       dset = self.store["{}/{}".format(chrom, dset_name)]
       msg[chrom] = dset.value
+      print(chrom)
       self.server.message(encode(msg))
       msg = original_msg.copy()
 

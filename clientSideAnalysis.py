@@ -73,7 +73,7 @@ class ServerTalker(object):
     self.status     = ""
     self.scratch    = scratch
     self.server     = server
-    self.store_path      = None
+    self.store_path      = self._store_path()
     if not os.path.exists(scratch):
       os.makedirs(scratch)
     self.local_n = None
@@ -86,13 +86,18 @@ class ServerTalker(object):
     self.tqdm   = None
     self.verbose = True
 
+  def _store_path(self):
+    plinkName = self.store_name
+    basename = os.path.basename(plinkName)
+    write_to = self.scratch
+    store_name = os.path.join(write_to, basename + '.h5py')
+    return store_name
 
 
   def plinkToH5(self):
     """Gets plink prefix, produces an HDF file with the same prefix"""
     plinkName = self.store_name
     plink_file = plinkfile.open(plinkName)
-    write_to = self.scratch
     if not plink_file.one_locus_per_row():
       print( "This script requires that snps are rows and samples columns.")
       sys.exit(1)
@@ -100,10 +105,7 @@ class ServerTalker(object):
     sample_list = plink_file.get_samples()
     locus_list = plink_file.get_loci()
     n_tot = len(sample_list)
-    basename = os.path.basename(plinkName)
-    store_name = os.path.join(write_to, basename + '.h5py')
-    self.store_path = store_name
-    with h5py.File(store_name, 'w', libver='latest', swmr=True) as store: 
+    with h5py.File(self.store_path, 'w', libver='latest', swmr=True) as store: 
       store.attrs['n'] = len(sample_list)
       store.attrs['has_local_AF'] = False
       store.attrs['has_global_AF'] = False
@@ -189,7 +191,9 @@ class ServerTalker(object):
         #chrom = [key for key, _ in message.items() if key not in ["TASK", "SUBTASK"]][0]
         #if str(chrom) in self.chroms: 
           #self.chroms.remove(str(chrom))
-        self.store_message(message, "PCA_passed")
+        chrom = self.store_message(message, "PCA_passed")
+        print("here")
+        self.chroms.remove(chrom)
         if not self.chroms:
           self.chroms = None
           self.load_chroms()

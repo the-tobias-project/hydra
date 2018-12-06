@@ -9,13 +9,14 @@ import _pickle as pickle
 
 
 ### SPLIT THE CONNECTION SO THAT IT CAN GO BACK TO OTHER TASKS
+#TODO: graceful exit 
 
 PORT = 9000
 NUM = 3
 local_scratch="/local/scratch/armin/Hydra"
 # commands
-EXIT, INIT, QC, HELP = "EXIT", "INIT", "QC", "HELP"
-OPTIONS = [HELP, INIT, QC, EXIT]
+EXIT, INIT, QC, HELP, PCA = "EXIT", "INIT", "QC", "HELP", "PCA"
+OPTIONS = [HELP, INIT, QC, PCA,  EXIT]
 QC_OPTIONS = ['HWE', 'MAF', 'MPS', 'MPI', 'snp']
 PCA_OPTIONS = ['HWE', 'MAF', 'MPS', 'MPI', 'snp', "LD"]
 nameSpace = {str(item): item for item in OPTIONS}
@@ -40,8 +41,10 @@ class Hub(protocol.Protocol):
       self.dispatcher = ServerTalker(NUM, self, 
           local_scratch)
       self.cache   = None
+      self.moveOn  = False
 
     def get_response(self, options):
+      self.moveOn = False
       options = [val.upper() for val in options]
       waiting_for_command = True
       while waiting_for_command:
@@ -71,7 +74,6 @@ class Hub(protocol.Protocol):
         val = input("""Indicate the filters and corresponding values(e.g. hwe 10e-5). Available filters are HWE, MAF, MPS(Missing Per sample), MPN(Missing per snp), snp(rsid) (MPS not implemented yet): """)
         val = val.upper()
         vals = val.split()
-        pdb.set_trace()
         if vals[0] == EXIT:
           self.tearDown()
           return
@@ -81,13 +83,20 @@ class Hub(protocol.Protocol):
           subtasks = [v.upper() for v in vals[::2]]
           vals     = vals[1::2]
           # Sanity checks:
-          assert len(set(subtasks)) == len(subtasks)
-          assert set(subtasks).issubset(QC_OPTIONS)
+          if not len(set(subtasks)) == len(subtasks):
+            print("You can only use the same filter once.")
+            continue
+          if not set(subtasks).issubset(QC_OPTIONS):
+            print("Wrong keywords")
+            continue 
           break
       vals = [float(v) for v in vals]
-      message = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS":subtasks, "VALS":vals})
-      self.message(message)
-      self.dispatcher.QC_filters(subtasks, vals)
+      outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS":subtasks, "VALS":vals})
+      self.message(outMessage)
+      inMessage= { "TASK":"QC", "SUBTASK":subtasks, "VALS":vals}
+      message_queue.put(inMessage)
+      self.moveOn = True
+      #reactor.callLater(2, self.run_pca())
       
 
     def run_init(self):
@@ -110,9 +119,10 @@ class Hub(protocol.Protocol):
           assert set(subtasks).issubset(PCA_OPTIONS)
           break 
       vals = [float(v) for v in vals]
-      message = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS":subtasks, "VALS":vals})
-      self.message(message)
-      self.dispatcher.PCA_filters(subtasks,vals)
+      outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS":subtasks, "VALS":vals})
+      self.message(outMessage)
+      inMessage = {"TASK":"PCA", "SUBTASK":"FILTERS", "FILTERS":subtasks, "VALS": vals}
+      message_queue.put(inMessage)
 
     def connectionMade(self):
       print("connected to user" , (self))
@@ -127,8 +137,12 @@ class Hub(protocol.Protocol):
     def wait_for_and_process_next_message(self):
       reactor.callLater(0, self._wait_for_and_process_next_message)
 
+
     @inlineCallbacks
     def _wait_for_and_process_next_message(self):
+      if not message_queue.pending and self.moveOn:
+        self.get_response(OPTIONS)
+
       message = yield message_queue.get()
       yield threads.deferToThread(self.dispatcher.dispatch, message)
       self.wait_for_and_process_next_message()
