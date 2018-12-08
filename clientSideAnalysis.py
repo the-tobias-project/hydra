@@ -1,40 +1,17 @@
 # rmin Pourshafeie
 
-#TODO write a generator that takes the chromosome and spits out data. do the regression in parallel 
 #TODO documentation
-# Running the gwas
-import logging
-import pdb
-import numpy as np
-import gzip, re, gc
-from sklearn.linear_model import LogisticRegression
-import statsmodels.formula.api as smf
-from statsmodels.tools.tools import add_constant
-from functools import partial
-from pathos.multiprocessing import ProcessingPool as Pool
-import sklearn.decomposition as decomp 
-from scipy.linalg import svd
-from scipy.stats import chi2 
-from scipy.sparse.linalg import eigsh as eig 
-from optimizationAux import *
-from plinkio import plinkfile
-# Careful here, eigh uses https://software.intel.com/en-us/mkl-developer-reference-c-syevr behind the hood
-# so it can be significantly slower 
-from numpy.core import _methods
-from sklearn.utils.extmath import randomized_svd, svd_flip
-import time, sys
-from numpy.linalg import inv as inverse
-from numpy.core import umath as um
-from numpy import mean, isnan
-from sklearn.metrics import log_loss
-
-
-
 import json, bson
 import _pickle as pickle
-import plinkio
+import numpy as np
+import plinkio, json, tqdm, time, sys
 import h5py, os, tqdm, itertools
+from plinkio import plinkfile
+import pdb
+
+# In house packages
 from corr import nancorr, corr, HweP
+#from optimizationAux import * # To be used later
 
 with open("GLOBALS.json", 'r') as fp:
   locals_dict = json.load(fp)
@@ -47,20 +24,6 @@ def encode(message):
 
 def decode(message):
   return pickle.loads(message)
-
-#from numpy.core import umath as um
-#umr_maximum = um.maximum.reduce
-umr_sum = um.add.reduce
-maximum = np.maximum
-add     = np.add
-_mean   = _methods._mean
-_sum    = _methods._sum
-sub     = np.subtract 
-div     = np.divide 
-chi2sf  = chi2.sf
-sqrt    = np.sqrt
-
-mean = np.mean
 
 kExactTestBias = 0.00000000000000000000000010339757656912845935892608650874535669572651386260986328125;
 kSmallEpsilon = 0.00000000000005684341886080801486968994140625;

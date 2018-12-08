@@ -1,10 +1,9 @@
 from twisted.internet import reactor, protocol, threads
 from twisted.internet.defer import DeferredQueue, inlineCallbacks
-import msgpack
 import time
 from serverSideAnalysis import ServerTalker, decode
 import pdb, sys
-import bson, json
+import json
 import _pickle as pickle
 
 

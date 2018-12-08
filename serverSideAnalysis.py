@@ -1,58 +1,28 @@
 # Armin Pourshafeie
 
-#TODO write a generator that takes the chromosome and spits out data. do the regression in parallel 
 #TODO documentation
 # Running the gwas
-import logging
-import numpy as np
-import gzip, h5py, os, re, gc, tqdm
-from sklearn.linear_model import LogisticRegression
-import statsmodels.formula.api as smf
-from statsmodels.tools.tools import add_constant
-from functools import partial
-from pathos.multiprocessing import ProcessingPool as Pool
-import sklearn.decomposition as decomp 
-from scipy.linalg import svd
-from scipy.stats import chi2 
-from scipy.sparse.linalg import eigsh as eig 
-from optimizationAux import *
-from plinkio import plinkfile
 # Careful here, eigh uses https://software.intel.com/en-us/mkl-developer-reference-c-syevr behind the hood
 # so it can be significantly slower 
-from numpy.core import _methods
-from sklearn.utils.extmath import randomized_svd, svd_flip
-import time, sys
-from corr import nancorr, corr, hweP
-from numpy.linalg import inv as inverse
-from numpy.core import umath as um
-from numpy import mean, isnan
-from sklearn.metrics import log_loss
 
 
 
-import msgpack, json, bson
 import _pickle as pickle
 import pdb
-import tqdm
+import tqdm, time, json
+import numpy as np
+import h5py, os, sys
+from plinkio import plinkfile
+
+# In house packages files
+from corr import nancorr, corr, hweP
+#from optimizationAux import * # This will be used later
 
 with open('GLOBALS.json', 'r') as fp:
   locals_dict = json.load(fp)
 for key,val in locals_dict.items():
     exec(key + '=val')
 
-#from numpy.core import umath as um
-#umr_maximum = um.maximum.reduce
-umr_sum = um.add.reduce
-maximum = np.maximum
-add     = np.add
-_mean   = _methods._mean
-_sum    = _methods._sum
-sub     = np.subtract 
-div     = np.divide 
-chi2sf  = chi2.sf
-sqrt    = np.sqrt
-
-mean = np.mean
 
 kExactTestBias = 0.00000000000000000000000010339757656912845935892608650874535669572651386260986328125;
 kSmallEpsilon = 0.00000000000005684341886080801486968994140625;
@@ -114,6 +84,8 @@ class ServerTalker(object):
         if self.counter == 0:
           msg = {"TASK":self.task, "SUBTASK":self.subtask}
           self.report_content("PCA_passed", msg)
+      if self.subtask == "COV":
+        self.buildCov(message)#START HERE
 
     elif task == "Association":
       pass 
@@ -316,6 +288,17 @@ class ServerTalker(object):
       self.server.message(encode(msg))
       time.sleep(1)
       msg = original_msg.copy()
+
+  def buildCov(message):
+    # store the chunks in the store. build on them 
+    ch1 = msg["CH1"] 
+    ch2 = msg["CH2"]
+    group = self.store["meta"]
+    if "{}_{}".format(ch1, ch2) in group:
+      del group["{}_{}".format(ch1, ch2)]
+    group.create_dataset("{}_{}".format(ch1, ch2), data = message["MAT"])
+
+
 
 
 if __name__=='__main__':
