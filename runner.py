@@ -14,5 +14,5 @@ def main(plinkList):
 
 
 if __name__ == "__main__":
-  main(['smallData/popres1', 'smallData/popres2', 'smallData/popres3'])
+  main(['testData/dset1', 'testData/dset2', 'testData/dset3'])
 

@@ -3,6 +3,7 @@ import time
 import clientSideAnalysis
 from serverSideAnalysis import decode 
 import sys
+from twisted.internet.defer import DeferredQueue, inlineCallbacks
 import pdb
 
 
@@ -20,6 +21,8 @@ class MyClient(protocol.Protocol):
     print ("clients are ", self.factory.clients)
 
     self.cdispatcher = clientSideAnalysis.ServerTalker(plink, local_scratch, self)
+    self.wait_for_and_process_next_message()
+
 
   def clientConnectionLost(self, reason):
     #TODO send warning
@@ -31,7 +34,7 @@ class MyClient(protocol.Protocol):
     try:
       message = decode(data)
       self.cache = None
-      threads.deferToThread(self.cdispatcher.dispatch, message)
+      message_queue.put(message)
     except Exception as e:
       self.cache = data
 
@@ -41,6 +44,15 @@ class MyClient(protocol.Protocol):
   def _message(self, data):
     self.transport.write(data)
 
+  def wait_for_and_process_next_message(self):
+    reactor.callLater(0, self._wait_for_and_process_next_message)
+
+  @inlineCallbacks
+  def _wait_for_and_process_next_message(self):
+    message = yield message_queue.get()
+    yield threads.deferToThread(self.cdispatcher.dispatch, message)
+
+
 class MyClientFactory(protocol.ClientFactory):
     protocol = MyClient
 
@@ -49,7 +61,7 @@ class MyClientFactory(protocol.ClientFactory):
 #factory.clients = []
 #reactor.run()
 #
-#message_queue = DeferredQueue()
+message_queue = DeferredQueue()
 if __name__=="__main__":
   plink = sys.argv[1]
 

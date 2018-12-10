@@ -27,6 +27,7 @@ for key,val in locals_dict.items():
 kExactTestBias = 0.00000000000000000000000010339757656912845935892608650874535669572651386260986328125;
 kSmallEpsilon = 0.00000000000005684341886080801486968994140625;
 kLargeEpsilon = 1e-7
+SMALL_EPSILON = 0.00000000000005684341886080801486968994140625
 
 
 def encode(data):
@@ -61,8 +62,8 @@ class ServerTalker(object):
     self.subtask = subtask
     current_task = "{} {}".format(task, subtask)
     if self.status != current_task:
-      self.report_status()
       self.status = current_task
+      self.report_status()
     if self.task == "INIT":
       if subtask == "POS":
         self.store_positions(message)
@@ -132,20 +133,20 @@ class ServerTalker(object):
 
     for chrom in self.store.keys():
       counts_dset = self.store["{}/counts".format(chrom)].value
-      missing_rate = counts_dset[:,3] / N
+      missing_rate = counts_dset[:,3] / float(N)
       #msg = {"TASK":task, "SUBTASK": "STATS", "CHROM": chrom, "MISS": missing_rate}
       #self.server.message(encode(msg))
       missing_rate_dset = self.store.create_dataset("{}/missing_rates".format(chrom), data=missing_rate)
-      af = (counts_dset[:,0] * 2 + counts_dset[:,1]).astype(float)
-      af /= (np.sum(counts_dset, axis=1)*2)
+      af = (counts_dset[:,2] * 2 + counts_dset[:,1]).astype(float)
+      af /= (np.sum(counts_dset[:,:3], axis=1)*2)
       af = af #np.minimum(af, 1-af)
       #msg = {"TASK":task, "SUBTASK": "STATS", "CHROM":chrom, "AF": af}
       #self.server.message(encode(msg))
       self.store.create_dataset("{}/allele_freq".format(chrom), data=af)
       var = counts_dset[:,0] * (2*af)**2 + counts_dset[:,1] * (1-2*af)**2 + counts_dset[:,2] * (2-2*af)**2
-      var /= (N-counts_dset[:,3])
+      var /= (N-counts_dset[:,3]) # 2*af*(1-af)
       self.store.create_dataset("{}/var".format(chrom), data=var)
-      hwe = hweP(counts_dset[:,:3].astype(np.int32), 0) # Recompile HWEP with uint32
+      hwe = hweP(counts_dset[:,:3].astype(np.int32), 1) # Recompile HWEP with uint32
       msg = {"TASK":task, "SUBTASK": "STATS", "CHROM":chrom, "HWE": hwe, "MISS":missing_rate, "AF":af, "VAR":var}
       self.server.message(encode(msg))
       hwe_dset = self.store.create_dataset("{}/hwe".format(chrom), data=hwe)
@@ -173,7 +174,7 @@ class ServerTalker(object):
         tokeep = np.logical_and(tokeep, 1.0-af.value > value_list[ind])
       if QC_MPS in filter_list:
         ind = filter_list.index(QC_MPS)
-        tokeep = np.logical_and(tokeep, mr.value > value_list[ind])
+        tokeep = np.logical_and(tokeep, mr.value < value_list[ind])
       print("in chromosome {}, {} snps were deleted and {} snps remain".format(chrom, tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
         
       if prefix is None: 
