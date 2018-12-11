@@ -33,8 +33,8 @@ class MyClient(protocol.Protocol):
       data = self.cache + data
     try:
       message = decode(data)
-      self.cache = None
       message_queue.put(message)
+      self.cache = None
     except Exception as e:
       self.cache = data
 
@@ -51,6 +51,7 @@ class MyClient(protocol.Protocol):
   def _wait_for_and_process_next_message(self):
     message = yield message_queue.get()
     yield threads.deferToThread(self.cdispatcher.dispatch, message)
+    self.wait_for_and_process_next_message()
 
 
 class MyClientFactory(protocol.ClientFactory):

@@ -202,8 +202,8 @@ class ServerTalker(object):
       chrom_group = store[str(chrom)]
       if "MISS" in message: 
         vals = message["MISS"]
-        task = "Missing_per_snp"
-        dset = chrom_group.create_dataset(task, data=vals)
+        task = "not_missing_per_snp"
+        dset = chrom_group.create_dataset(task, data=1-vals)
       if "AF" in message:
         vals = message["AF"]
         task = 'MAF'
@@ -281,22 +281,29 @@ class ServerTalker(object):
         tokeep    = np.ones_like(positions, dtype=bool)
         tokeep    = find_what_passes(QC_HWE, "hwe", tokeep)
         tokeep    = find_what_passes(QC_MAF, "MAF", tokeep, doubleSided=True)
-        tokeep    = find_what_passes(QC_MPS, "Missing_per_snp", tokeep)
+        if QC_MPS in filter_list:
+          ind = filter_list.index(QC_MPS)
+          value_list[ind] = 1 - value_list[ind]
+        tokeep    = find_what_passes(QC_MPS, "not_missing_per_snp", tokeep)
         print("After filtering, {} snps remain".format(np.sum(tokeep)))
         if remove: # Delete what doesn't pass 
           replace_dataset(tokeep, 'hwe')
           replace_dataset(tokeep, 'MAF')
-          replace_dataset(tokeep, 'Missing_per_snp')
+          replace_dataset(tokeep, 'not_missing_per_snp')
           deleted = replace_dataset(tokeep, 'positions',return_deleted=True)
           for snp in deleted:
-            del group[str(snp)]
+            snp = str(snp)
+            if snp in group:
+              del group[snp]
         else: # Store what has been tagged
           if "passed" in group: 
             tags = group["passed"]
             tokeep = np.logical_and(tokeep, tags.value)
             tags[:] = tokeep
           else:
-            group.create_dataset("passed", data=tokeep)
+            group.create_dataset("PCA_passed", data=np.ones(np.sum(tokeep),dtype=bool))
+            positions = group['positions'].value[tokeep]
+            group.create_dataset("PCA_positions", data=positions)
 
   ### PCA
   def run_snp_filters(self, message):
@@ -318,7 +325,7 @@ class ServerTalker(object):
           self.chroms = [i for i in store.keys() if i!= 'meta']
         n = 0
         for chrom in self.chroms:
-          n = max(n, len(fp["{}/positions".format(chrom)]))
+          n = max(n, len(fp["{}/PCA_positions".format(chrom)]))
 
       print("LD pruning. This will take some time...")
       self.tqdm = tqdm.tqdm(total=n)
@@ -333,7 +340,7 @@ class ServerTalker(object):
     with h5py.File(self.store_path, 'r') as store:
       n = store.attrs['n']
       for chrom in self.chroms:
-        tags = store["{}/passed".format(chrom)]
+        tags = store["{}/PCA_passed".format(chrom)]
         if chrom in message:
           state = message[chrom]
           if state[0] == "E": # Finished with this chrom
@@ -353,7 +360,7 @@ class ServerTalker(object):
           end = min(self.r3 + self.r1, tags.shape[0])
           tokeep = tags[self.r3: end]
  
-        pos = store["{}/positions".format(chrom)]
+        pos = store["{}/PCA_positions".format(chrom)]
         positions = pos[self.r3: end]
         positions = positions[tokeep] 
         genotypes = np.empty((n,len(positions)), dtype=np.float32)

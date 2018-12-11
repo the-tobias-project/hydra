@@ -148,6 +148,7 @@ class ServerTalker(object):
       self.store.create_dataset("{}/var".format(chrom), data=var)
       hwe = hweP(counts_dset[:,:3].astype(np.int32), 1) # Recompile HWEP with uint32
       msg = {"TASK":task, "SUBTASK": "STATS", "CHROM":chrom, "HWE": hwe, "MISS":missing_rate, "AF":af, "VAR":var}
+      time.sleep(1)
       self.server.message(encode(msg))
       hwe_dset = self.store.create_dataset("{}/hwe".format(chrom), data=hwe)
 
@@ -195,8 +196,16 @@ class ServerTalker(object):
         d5[:] = af_vals
 
       else:
-        d1 = group.require_dataset(prefix + "passed", tokeep.shape, dtype=bool)
-        d1[:] = tokeep
+        n = np.sum(tokeep)
+        ones = np.ones(n, dtype=bool)
+        d1 = group.require_dataset(prefix + "passed", ones.shape, dtype=bool)
+        d1[:] = ones
+        pos_vals = pos.value[tokeep]
+        d2 = group.require_dataset(prefix + "positions", pos_vals.shape, dtype=pos_vals.dtype)
+        d2[:] = pos_vals
+        af_vals = af.value[tokeep]
+        d3 = group.require_dataset(prefix + "allele_freq",af_vals.shape, dtype=af_vals.dtype)
+        d3[:] = af_vals
       #self.task = "PCA"
       #self.subtask = "FILTERS"
 
@@ -204,18 +213,21 @@ class ServerTalker(object):
 # PCA stuff 
 
   def PCA_filters(self, filter_list, value_list):
+    ld_prune = False
     if PCA_LD in filter_list: 
+      ld_prune = True
       ind = filter_list.index(PCA_LD)
       winsize = value_list.pop(ind)
       filter_list.pop(ind)
       self.r1 = int(winsize)
       self.r2 = int(winsize/2)
+    self.QC_filters(filter_list, value_list, prefix="PCA_")
+    if ld_prune:
       n = 0
       for chrom in self.store:
-        n = max(n, len(self.store["{}/positions".format(chrom)]))
+        n = max(n, len(self.store["{}/PCA_positions".format(chrom)]))
       self.tqdm = tqdm.tqdm(total=n)
 
-    self.QC_filters(filter_list, value_list, prefix="PCA_")
 
 
   def ld_filters(self, message, thresh=0.2):
@@ -241,8 +253,9 @@ class ServerTalker(object):
         corr_tot = corr(self.sumLin[key], self.sumSq[key], self.cross[key])
         group  = self.store[key]
         tokeep = self.store["{}/PCA_passed".format(key)].value
-        end = min(self.r1 + self.r0, len(tokeep))
-        maf = self.store["{}/allele_freq".format(key)].value[self.r0:end]
+        positions = self.store["{}/PCA_positions".format(key)].value
+        end = min(self.r1 + self.r0, len(positions))
+        maf = self.store["{}/PCA_allele_freq".format(key)].value[self.r0:end]
         maf = maf[tokeep[self.r0:end]]
         n = maf.shape[0]
         unfiltered = np.ones((n, ), dtype=bool)

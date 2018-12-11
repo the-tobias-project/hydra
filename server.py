@@ -40,10 +40,8 @@ class Hub(protocol.Protocol):
       self.dispatcher = ServerTalker(NUM, self, 
           local_scratch)
       self.cache   = None
-      self.moveOn  = False
 
     def get_response(self, options):
-      self.moveOn = False
       options = [val.upper() for val in options]
       waiting_for_command = True
       while waiting_for_command:
@@ -70,7 +68,7 @@ class Hub(protocol.Protocol):
     def run_QC(self):
       task = "QC"
       while True:
-        val = input("""Indicate the filters and corresponding values(e.g. hwe 10e-5). Available filters are HWE, MAF, MPS(Missing Per sample), MPN(Missing per snp), snp(rsid) (MPS not implemented yet): """)
+        val = input("""Indicate the filters and corresponding values(e.g. hwe 1e-5). Available filters are HWE, MAF, MPS(Missing Per sample), MPN(Missing per snp), snp(rsid) (MPS not implemented yet): """)
         val = val.upper()
         vals = val.split()
         if vals[0] == EXIT:
@@ -94,7 +92,7 @@ class Hub(protocol.Protocol):
       self.message(outMessage)
       inMessage= { "TASK":"QC", "SUBTASK":subtasks, "VALS":vals}
       message_queue.put(inMessage)
-      self.moveOn = True
+      message_queue.put("GET OPTIONS")
       #reactor.callLater(2, self.run_pca())
       
 
@@ -139,12 +137,15 @@ class Hub(protocol.Protocol):
 
     @inlineCallbacks
     def _wait_for_and_process_next_message(self):
-      if not message_queue.pending and self.moveOn:
-        self.get_response(OPTIONS)
+#      if not message_queue.pending and self.moveOn:
+#        self.get_response(OPTIONS)
 
       message = yield message_queue.get()
-      yield threads.deferToThread(self.dispatcher.dispatch, message)
-      self.wait_for_and_process_next_message()
+      if message == "GET OPTIONS":
+        self.get_response(OPTIONS)
+      else:
+        yield threads.deferToThread(self.dispatcher.dispatch, message)
+        self.wait_for_and_process_next_message()
 
     def message(self, command):
       reactor.callFromThread(self._message, command)
