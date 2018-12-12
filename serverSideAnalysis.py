@@ -69,13 +69,18 @@ class ServerTalker(object):
       self.QC_filters(message["SUBTASK"], message["VALS"])
     elif self.task == "PCA":
       if self.subtask == "FILTERS":
-        self.PCA_filters(message["FILTERS"], message["VALS"])
+        continue_to_ld_prune = self.PCA_filters(message["FILTERS"], message["VALS"])
         self.counter = self.connections
         self.r0      = 0
-        return
+        if continue_to_ld_prune:
+          return
+        else:
+          self.subtask = "PCA_POS"
+          self.counter = 1
       if self.subtask == "LD":
         self.ld_filters(message)
       if self.subtask == "PCA_POS":
+        pdb.set_trace()
         self.counter -= 1
         if self.counter == 0: #NOTE I don't think this is neccessary
           msg = {"TASK":self.task, "SUBTASK":self.subtask}
@@ -226,6 +231,7 @@ class ServerTalker(object):
       for chrom in chroms:
         n = max(n, len(self.store["{}/PCA_positions".format(chrom)]))
       self.tqdm = tqdm.tqdm(total=n)
+    return ld_prune
 
 
 

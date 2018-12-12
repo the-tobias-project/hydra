@@ -61,9 +61,7 @@ The initial command prompt reappears. At this point, we can exit to further anal
 ```
 Looks like everyone is here. Type the stage you want to proceed with? Options: HELP, INIT, QC, PCA, EXIT:  
 >pca
-```
 
-```
 Specify filters for PCA pre-processing: (OPTIONS: HWE, MAF, MPS, as before as well as LD. e.g. maf 0.1 LD 50:  
 >maf 0.1 ld 50
 ...

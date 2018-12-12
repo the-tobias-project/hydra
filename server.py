@@ -81,9 +81,12 @@ class Hub(protocol.Protocol):
       self.message(outMessage)
       inMessage= { "TASK":"QC", "SUBTASK":subtasks, "VALS":vals}
       message_queue.put(inMessage)
-      message_queue.put("GET OPTIONS")
+      self.get_options()
       #reactor.callLater(2, self.run_pca())
       
+
+    def get_options(self):
+      message_queue.put("GET OPTIONS")
 
     def run_init(self):
       message = pickle.dumps({"TASK": "INIT", "SUBTASK":"STORE"})

@@ -26,10 +26,6 @@ def encode(message):
 def decode(message):
   return pickle.loads(message)
 
-kExactTestBias = 0.00000000000000000000000010339757656912845935892608650874535669572651386260986328125;
-kSmallEpsilon = 0.00000000000005684341886080801486968994140625;
-kLargeEpsilon = 1e-7
-
 class ServerTalker(object):
   """Dispatches commands from/to the server"""
   def __init__(self, store_name, scratch, server):
