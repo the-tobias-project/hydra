@@ -13,22 +13,11 @@ import _pickle as pickle
 PORT = 9000
 NUM = 3
 local_scratch="/local/scratch/armin/Hydra"
-# commands
-EXIT, INIT, QC, HELP, PCA = "EXIT", "INIT", "QC", "HELP", "PCA"
-OPTIONS = [HELP, INIT, QC, PCA,  EXIT]
-QC_OPTIONS = ['HWE', 'MAF', 'MPS', 'MPI', 'snp']
-PCA_OPTIONS = ['HWE', 'MAF', 'MPS', 'MPI', 'snp', "LD"]
-nameSpace = {str(item): item for item in OPTIONS}
-nameSpace['OPTIONS'] = OPTIONS
-nameSpace['QC_OPTIONS'] = QC_OPTIONS
-nameSpace['PCA_OPTIONS'] = PCA_OPTIONS
-for var in QC_OPTIONS:
-  nameSpace["QC_{}".format(var)] = var
-for var in PCA_OPTIONS:
-  nameSpace["PCA_{}".format(var)] = var
 
-with open("GLOBALS.json", 'w') as varNames:
-  json.dump(nameSpace, varNames)
+with open("GLOBALS.json", 'r') as fp:
+  local_dict = json.load(fp)
+for key, val in local_dict.items():
+  exec(key + '=val')
   
 HELP_STRING="HELP MEEEEE"
 
