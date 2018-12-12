@@ -1,0 +1,9 @@
+Cython==0.28.2
+h5py==2.8.0
+plinkio==0.9.6
+Twisted==18.9.0
+tqdm==4.26.0
+numpy==1.15.2
+jsonschema==2.6.0
+scipy==1.1.0
+
