@@ -5,8 +5,9 @@ import json, bson
 import _pickle as pickle
 import numpy as np
 import plinkio, json, tqdm, time, sys
-import h5py, os, tqdm, itertools
+import h5py, os, itertools
 from plinkio import plinkfile
+from sklearn.utils.extmath import svd_flip
 import pdb
 
 # In house packages
@@ -123,8 +124,8 @@ class ServerTalker(object):
         dset = current_group.require_dataset('positions',
             (len(positions),), dtype=np.uint32) 
         dset[:] = np.array(positions, dtype=np.uint32)
-        msg = encode({"TASK":"INIT", "SUBTASK":"POS", "CHROM":current_chr, "POS":positions})
-        self.server.message(msg)
+        msg = {"TASK":"INIT", "SUBTASK":"POS", "CHROM":current_chr, "POS":positions}
+        self.server.message(encode(msg))
 
 
 
@@ -163,7 +164,8 @@ class ServerTalker(object):
           self.load_chroms()
           self.standardize_data(scale=False, center=True)
           self.report_covariance(self.chroms , "PCA_passed")
-
+      if subtask == "PCS":
+        self.compute_Us(message)
 
 
       pass
@@ -385,12 +387,13 @@ class ServerTalker(object):
 #          self.server.message(encode(msg))
         return key
   def report_covariance(self, chroms, mask_name):
+    print("reporting cov")
     msg = {"TASK": "PCA", "SUBTASK":"COV"}
     with h5py.File(self.store_path, 'r') as store:
       n = store.attrs["n"]
       for i_ch1, ch1 in enumerate(chroms):
         group = store[ch1]
-        pos   = group["positions"].value
+        pos   = group["PCA_positions"].value
         mask  = group[mask_name].value
         pos   = pos[mask]
         g1     = np.empty((len(pos), n))
@@ -402,7 +405,7 @@ class ServerTalker(object):
           if i_ch2 > i_ch1 :
             break
           group = store[ch2]
-          pos   = group["positions"].value
+          pos   = group["PCA_positions"].value
           mask  = group[mask_name].value
           pos   = pos[mask]
           g2     = np.empty((n, len(pos)))
@@ -413,7 +416,40 @@ class ServerTalker(object):
           msg["CH1"] = ch1
           msg["CH2"] = ch2
           msg["MAT"] = g1.dot(g2).astype(np.float32)
-          print(ch1, ch2)
+          if ch1 == chroms[-1] and ch2 == chroms[-1]:
+            msg["E"] = True
+          self.server.message(encode(msg))
+
+
+  def compute_Us(self, message):
+    inv_sigma = message["ISIG"]
+    v      = message["V"]
+    chroms = message["CHROMS"]
+    with h5py.File(self.store_path, 'a') as store:
+      dset = store["meta"]
+      pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
+      n = 0
+      for chrom in chroms: 
+        n += np.sum(store["{}/PCA_passed".format(chrom)])
+      num_inds = store.attrs["n"]
+      arr = np.empty((num_inds, n))
+      offset = 0
+      for chrom in chroms:
+        group = store[str(chrom)]
+        tokeep    = group["PCA_passed"].value
+        positions = group["PCA_positions"].value[tokeep]
+        for i, position in enumerate(positions): 
+          arr[:, offset+i] = group[str(position)].value
+        offset += i
+      u = arr.dot(v.T).dot(np.diag(inv_sigma))
+      u, v = svd_flip(u, v, u_based_decision=False)
+      pca_vt = dset.require_dataset('pca_v.T', shape=v.shape, dtype=np.float32)
+      pca_vt[:,:] = v
+      pca_u = dset.require_dataset('pca_u', shape=u.shape, dtype=np.float32)
+      pca_u[:,:] = u
+      
+      
+
 
 
    

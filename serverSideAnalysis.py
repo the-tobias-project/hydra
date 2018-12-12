@@ -11,8 +11,9 @@ import _pickle as pickle
 import pdb
 import tqdm, time, json
 import numpy as np
-import h5py, os, sys
+import h5py, os, sys, itertools
 from plinkio import plinkfile
+from scipy.sparse.linalg import eigsh as eig
 
 # In house packages files
 from corr import nancorr, corr, hweP
@@ -82,11 +83,14 @@ class ServerTalker(object):
         self.ld_filters(message)
       if self.subtask == "PCA_POS":
         self.counter -= 1
-        if self.counter == 0:
+        if self.counter == 0: #NOTE I don't think this is neccessary
           msg = {"TASK":self.task, "SUBTASK":self.subtask}
           self.report_content("PCA_passed", msg)
+          self.counter = None
       if self.subtask == "COV":
-        self.buildCov(message)#START HERE
+        print("building covariance")
+        if self.buildCov(message):
+          self.pca()
 
     elif task == "Association":
       pass 
@@ -224,7 +228,8 @@ class ServerTalker(object):
     self.QC_filters(filter_list, value_list, prefix="PCA_")
     if ld_prune:
       n = 0
-      for chrom in self.store:
+      chroms = [v for v in self.store.keys() if v != 'meta']
+      for chrom in chroms:
         n = max(n, len(self.store["{}/PCA_positions".format(chrom)]))
       self.tqdm = tqdm.tqdm(total=n)
 
@@ -303,14 +308,61 @@ class ServerTalker(object):
       time.sleep(1)
       msg = original_msg.copy()
 
-  def buildCov(message):
+  def buildCov(self, msg):
     # store the chunks in the store. build on them 
+    if self.counter is None:
+      self.counter = self.connections
     ch1 = msg["CH1"] 
     ch2 = msg["CH2"]
+    if "meta" not in self.store:
+      self.store.create_group("meta")
     group = self.store["meta"]
+    data = msg["MAT"]
     if "{}_{}".format(ch1, ch2) in group:
+      data += group["{}_{}".format(ch1, ch2)].value
       del group["{}_{}".format(ch1, ch2)]
-    group.create_dataset("{}_{}".format(ch1, ch2), data = message["MAT"])
+    group.create_dataset("{}_{}".format(ch1, ch2), data=data)
+    if "E" in msg:
+      self.counter -= 1
+    
+    if self.counter == 0:
+      print("All covariances have been reported")
+      return True
+    return False
+
+  def pca(self, chroms=None, n_components=10):
+    if chroms is None: 
+      chroms = sorted([v for v in self.store.keys() if v != 'meta'])
+      print(chroms)
+    cov_size = 0
+    for chrom in chroms: 
+      cov_size += self.store["meta/{}_{}".format(chrom,chrom)].shape[0]
+
+    print("Starting covariance matrix of size {} x {}".format(cov_size, cov_size))
+    cov = np.empty((cov_size, cov_size))
+    i_old,j_old = 0, 0
+    for chrom1, chrom2 in itertools.product(chroms, chroms):
+      name = "meta/{}_{}".format(chrom1, chrom2)
+      if name in self.store:
+        usbcov = self.store[name].value
+      else:
+        usbcov = self.store["meta/{}_{}".format(chrom2, chrom1)].value
+      i_new = i_old + usbcov.shape[0]
+      j_new = j_old + usbcov.shape[1]
+      cov[i_old:i_new, j_old:j_new] = usbcov
+    sigma, v = eig(cov, k=n_components, ncv=3*n_components)
+    sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
+    v = np.array(v)
+    sigma = np.array(sigma)
+    sigma[sigma < 0] = 0
+    sigma = np.sqrt(sigma)
+    inv_sigma = sigma.copy()
+    inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
+    msg = {"TASK":"PCA", "SUBTASK":"PCS", "ISIG":inv_sigma, "V": v, "CHROMS":chroms}
+
+    self.server.message(encode(msg))
+
+
 
 
 
