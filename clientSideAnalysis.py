@@ -8,11 +8,12 @@ import plinkio, json, tqdm, time, sys
 import h5py, os, itertools
 from plinkio import plinkfile
 from sklearn.utils.extmath import svd_flip
+
 import pdb
 
 # In house packages
 from corr import nancorr, corr, HweP
-#from optimizationAux import * # To be used later
+from optimizationAux import *
 
 with open("GLOBALS.json", 'r') as fp:
   locals_dict = json.load(fp)
@@ -45,6 +46,10 @@ class ServerTalker(object):
     self.r3, self.r4 = None, None
     self.tqdm   = None
     self.verbose = True
+    self.covariates = None
+    self.Ys        = None
+    self.previous_estimates = {}
+    self.previous_Us = {}
 
   def _store_path(self):
     plinkName = self.store_name
@@ -160,15 +165,14 @@ class ServerTalker(object):
           self.load_chroms()
           self.standardize_data(scale=False, center=True)
           self.report_covariance(self.chroms , "PCA_passed")
+          self.r0, self.r1 = None, None
       if subtask == "PCS":
         self.compute_Us(message)
 
-
-      pass
-    elif task == "Association":
-      pass
-
-
+    elif task == ASSO:
+      if self.covariates is None:
+        self.load_covariates(message)
+      self.run_logistic_regression(message)
 
   def standardize_data(self, scale=False, center=True):
     with h5py.File(self.store_path, 'a') as store: 
@@ -187,6 +191,7 @@ class ServerTalker(object):
             genotypes[:] = vals - 2*af[i]
           if scale: 
             genotypes[:] = genotypes[:] / sd[i]
+            store.attrs["has_normalization"] = True
 
 
   def load_chroms(self):
@@ -212,7 +217,7 @@ class ServerTalker(object):
         dset = chrom_group.create_dataset(task, data=vals)
       if "VAR" in message:
         vals = message["VAR"]
-        task = "var"
+        task = "VAR"
         dset = chrom_group.create_dataset(task, data=vals)
 
 
@@ -446,9 +451,80 @@ class ServerTalker(object):
       
       
 
+###### ASSOCIATION 
+
+  def load_covariates(self, message):
+    vals = message["VARS"]
+    with h5py.File(self.store_path, 'r') as store:
+      n = store.attrs["n"]
+      if self.Ys is None:
+        self.Ys = np.sign(store["meta/Status"].value - 0.5).reshape(n, 1)
+      self.covariates = np.empty((n,vals[0] + len(vals)))
+      if vals[0] > 0: # Load up scores 
+        scores = store["meta/pca_u"].value[:,:vals[0]]
+        scores /= np.std(scores, axis = 0)
+        self.covariates[:,1:vals[0]+1] = scores  # already centered 
+        self.covariates[:,1:] *= -self.Ys
+
+        
+
+  def run_logistic_regression(self, message):
+    if "VARS" in message:
+      self.ncov       = message["VARS"][0] + 1 #Number of Pcs plus the snp 
+    if "CHROM" in message:
+      chrom      = message["CHROM"]
+      warm_start = message["VALS"]
+      msg = self._run_logistic_regression(chrom, self.ncov, warm_start)
+    else: # First iteration
+      self.load_chroms()
+      for chrom in self.chroms:
+        msg = self._run_logistic_regression(chrom, self.ncov,  None)
+    self.server.message(msg)
+
+    
+
+  def _run_logistic_regression(self, chrom, ncov, warm_start=None, rho=10.0, alpha=1.0):
+    # ASSUMES EVERYTHING IS CENTERED #TODO 
+    covariates = self.covariates
+    with h5py.File(self.store_path, 'r') as store:
+      group = store[chrom]
+      positions = group["positions"]
+      estimates = np.empty((ncov, len(positions))) # Can probably get away with float32 here
+      estimates[:, -1] = 0
+      is_standardized = store.attrs["has_normalization"]
+      std = np.sqrt(group["VAR"])
+      offset = 1
+      if chrom in self.previous_estimates:
+        z_hat = self.previous_estimates[chrom]
+        all_Us     = self.previous_Us[chrom] + z_hat - warm_start
+      else:
+        all_Us     = 0
+      for i, position in enumerate(positions):
+        if std[i] == 0:
+          estimates[:, i] = np.nan
+          offset += 1
+          continue
+        if is_standardized:
+          gval = group[str(position)].value
+        else:
+          gval = group[str(position)].value/std[i]
+        covariates[:,0] = gval
+        
+        if warm_start is None:
+          estimates[:,i] = bfgs_more_gutted(covariates, np.zeros((ncov, )), np.zeros((ncov,)), rho, estimates[:,i-offset],  ncov)
+          z_hat = alpha * estimates
+        else:
+          estimates[:,i] = bfgs_more_gutted(covariates, all_Us[:,i] , warm_start[:,i], rho, z_hat[:, i], ncov)
+          z_hat = alpha * estimates + (1-alpha) * warm_start
+        offset = 1
+    self.previous_estimates[chrom] = estimates
+    self.previous_Us[chrom] = all_Us
+    return encode({"TASK": ASSO, "SUBTASK":chrom, "CHROM":chrom, "VALS":z_hat})
+  
 
 
-   
+
+
 if __name__=='__main__':
   print("no commands here yet. Test using WTCCC_run.py")
 

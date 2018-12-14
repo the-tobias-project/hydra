@@ -45,13 +45,13 @@ class Hub(protocol.Protocol):
         print(HELP_STRING)
       elif val == INIT: 
         self.run_init()
-      elif val == "QC":
+      elif val == QC:
         self.run_QC()
-      elif val == "PCA":
+      elif val == PCA:
         self.run_pca()
         print(val)
-      elif val == "ASS": 
-        waiting_for_command = False
+      elif val == ASSO: 
+        self.run_logistic_regression()
       self.wait_for_and_process_next_message()
     
     def run_QC(self):
@@ -83,6 +83,24 @@ class Hub(protocol.Protocol):
       message_queue.put(inMessage)
       self.get_options()
       #reactor.callLater(2, self.run_pca())
+
+
+    def run_logistic_regression(self):
+      while True:
+        val = input("""Specify number of PCs followed by other covariates (Comma separated): """)
+        vals = val.split(',')
+        try: 
+          vals[0] = int(vals[0])
+          if len(vals) != 1:  #TODO 
+            print("We only support PCs for now")
+          else:
+            break
+        except NameError:
+          continue
+
+      outMessage = pickle.dumps({"TASK": ASSO, "SUBTASK": "INIT", "VARS":vals})
+      self.message(outMessage)
+
       
 
     def get_options(self):

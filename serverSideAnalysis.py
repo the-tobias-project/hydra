@@ -47,6 +47,7 @@ class ServerTalker(object):
     self.r1, self.r2 = None, None
     self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
     self.tqdm        = None
+    self.estimates   = {}
 
   def report_status(self):
     print("Now working on: {}".format(self.status))
@@ -80,7 +81,6 @@ class ServerTalker(object):
       if self.subtask == "LD":
         self.ld_filters(message)
       if self.subtask == "PCA_POS":
-        pdb.set_trace()
         self.counter -= 1
         if self.counter == 0: #NOTE I don't think this is neccessary
           msg = {"TASK":self.task, "SUBTASK":self.subtask}
@@ -90,9 +90,10 @@ class ServerTalker(object):
         print("building covariance")
         if self.buildCov(message):
           self.pca()
+          self.server.get_options()
 
-    elif task == "Association":
-      pass 
+    elif self.task == ASSO:
+      self.run_logistic_regression(message)
 
   def store_positions(self, message):
     chrom = message["CHROM"] 
@@ -350,6 +351,7 @@ class ServerTalker(object):
       i_new = i_old + usbcov.shape[0]
       j_new = j_old + usbcov.shape[1]
       cov[i_old:i_new, j_old:j_new] = usbcov
+    cov += cov.T
     sigma, v = eig(cov, k=n_components, ncv=3*n_components)
     sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
     v = np.array(v)
@@ -364,7 +366,22 @@ class ServerTalker(object):
 
 
 
+########### ASSOCIATION
 
+  def run_logistic_regression(self, message):
+    chrom = message["CHROM"]
+    z_hat = message["VALS"]
+    beta = np.sum(z_hat, 1)[:,None]/self.connections
+    if chrom in self.estimates:
+      prev = self.estimates[chrom]
+      if prev[1] == 1: 
+        beta = (prev[0] + z_hat)/(self.connections)
+        del self.estimates[chrom]
+        self.server.message(encode({"TASK":ASSO, "SUBTASK":None, "CHROM":chrom, "VALS":beta}))
+      else:
+        self.estimates[chrom] = [prev[0] + z_hat , prev[1]-1]
+    else: # Not in dictionary yet
+      self.estimates[chrom] = [z_hat, self.connections - 1]
 
 
 if __name__=='__main__':
