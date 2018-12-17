@@ -28,7 +28,8 @@ class MyClient(protocol.Protocol):
         self.factory.clients.append(self)
         print("clients are ", self.factory.clients)
 
-        self.cdispatcher = clientSideAnalysis.ServerTalker(plink, local_scratch, self)
+        self.cdispatcher = clientSideAnalysis.ServerTalker(plink, 
+            local_scratch, self)
         self.wait_for_and_process_next_message()
 
     def clientConnectionLost(self, reason):
@@ -63,13 +64,6 @@ class MyClient(protocol.Protocol):
 
 class MyClientFactory(protocol.ClientFactory):
     protocol = MyClient
-
-#factory = MyClientFactory()
-#reactor.connectTCP(HOST, PORT, factory)
-#factory.clients = []
-#reactor.run()
-#
-
 
 message_queue = DeferredQueue()
 if __name__=="__main__":

@@ -11,9 +11,8 @@ from twisted.internet.defer import DeferredQueue, inlineCallbacks
 
 # Internal lib
 from serverSideAnalysis import ServerTalker, decode
-from settings import Settings, Commands, Options, QCOptions, PCAOptions, QCHWE, PCAHWE
+from settings import Settings, Commands, Options, QCOptions, PCAOptions
 
-### SPLIT THE CONNECTION SO THAT IT CAN GO BACK TO OTHER TASKS
 # TODO: graceful exit
 
 PORT = 9000
@@ -126,7 +125,6 @@ class Hub(protocol.Protocol):
                 subtasks = [v.upper() for v in vals[::2]]
                 vals = vals[1::2]
                 assert len(set(subtasks)) == len(subtasks)
-                # assert set(subtasks).issubset(PCA_OPTIONS)
                 assert set(subtasks).issubset(PCAOptions.all_options)
                 break
         vals = [float(v) for v in vals]
@@ -149,9 +147,6 @@ class Hub(protocol.Protocol):
 
     @inlineCallbacks
     def _wait_for_and_process_next_message(self):
-        #      if not message_queue.pending and self.moveOn:
-        #        self.get_response(OPTIONS)
-
         message = yield message_queue.get()
         if message == "GET OPTIONS":
             self.get_response(Commands.all_commands)
