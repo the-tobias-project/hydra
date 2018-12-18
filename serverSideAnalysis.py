@@ -18,7 +18,7 @@ from scipy.sparse.linalg import eigsh as eig
 # Internal lib
 from corr import corr, hweP
 from settings import Settings, Commands, Options, QCOptions, PCAOptions, QCFilterNames, PCAFilterNames
-from utils import encode, decode
+from utils import encode, decode, write_or_replace
 
 #TODO documentation
 # Careful here, eigh uses https://software.intel.com/en-us/mkl-developer-reference-c-syevr behind the hood
@@ -43,6 +43,8 @@ class ServerTalker(object):
         self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
         self.tqdm        = None
         self.estimates   = {}
+        self.max_iters   = 50
+        self.iters       = {}
 
     def report_status(self):
         print("Now working on: {}".format(self.status))
@@ -88,7 +90,6 @@ class ServerTalker(object):
                 if self.buildCov(message):
                     self.pca()
                     self.server.get_options()
-
         elif self.task == Commands.ASSO:
             self.run_logistic_regression(message)
 
@@ -96,11 +97,8 @@ class ServerTalker(object):
         chrom = message["CHROM"] 
         positions = message["POS"]
         dsetname = "{}/positions".format(chrom)
-        if dsetname not in self.store:
-            print("{} loci in chromosome {}".format(len(positions), chrom))
-            dset = self.store.require_dataset(dsetname, (len(positions),)
-                , dtype=np.uint32)
-            dset[:] = np.array(positions, dtype=np.uint32)
+        write_or_replace(self.store, dsetname, positions, np.uint32)
+        print("{} loci in chromosome {}.".format(len(positions), chrom))
 
     def store_counts(self, message):
         n = message["n"] 
@@ -114,7 +112,7 @@ class ServerTalker(object):
         if dsetname not in self.store:
             dset = self.store.require_dataset(dsetname, (size, 4)
               , dtype=np.uint32)
-        else :
+        else:
             dset = self.store[dsetname]
         counts = message["COUNTS"]
         homo_ref = n - np.sum(counts, axis = 1)[:, np.newaxis].astype(
@@ -255,8 +253,8 @@ class ServerTalker(object):
             for key, val in message.items():
                 if key == "TASK" or key == "SUBTASK":
                     continue
-                corr_tot = corr(self.sumLin[key], self.sumSq[key]
-                    , self.cross[key])
+                corr_tot = corr(self.sumLin[key], self.sumSq[key],
+                    self.cross[key])
                 group  = self.store[key]
                 tokeep = self.store["{}/PCA_passed".format(key)].value
                 positions = self.store["{}/PCA_positions".format(key)].value
@@ -320,13 +318,12 @@ class ServerTalker(object):
             self.store.create_group("meta")
         group = self.store["meta"]
         data = msg["MAT"]
-        if "{}_{}".format(ch1, ch2) in group:
-            data += group["{}_{}".format(ch1, ch2)].value
-            del group["{}_{}".format(ch1, ch2)]
-        group.create_dataset("{}_{}".format(ch1, ch2), data=data)
+        cov_name = "{}_{}".format(ch1, ch2)
+        if cov_name in group:
+            data += group[cov_name].value
+        write_or_replace(group, cov_name, data)
         if "E" in msg:
             self.counter -= 1
-        
         if self.counter == 0:
             print("All covariances have been reported")
             return True
@@ -344,9 +341,9 @@ class ServerTalker(object):
         cov = np.empty((cov_size, cov_size))
         i_old,j_old = 0, 0
         for chrom1, chrom2 in itertools.product(chroms, chroms):
-            name = "meta/{}_{}".format(chrom1, chrom2)
-            if name in self.store:
-                usbcov = self.store[name].value
+            cov_name = "meta/{}_{}".format(chrom1, chrom2)
+            if cov_name in self.store:
+                usbcov = self.store[cov_name].value
             else:
                 usbcov = self.store["meta/{}_{}".format(chrom2, chrom1)].value
             i_new = i_old + usbcov.shape[0]
@@ -366,7 +363,6 @@ class ServerTalker(object):
         self.server.message(encode(msg))
 
 ################################ ASSOCIATION ###################################
-
     def run_logistic_regression(self, message):
         chrom = message["CHROM"]
         z_hat = message["VALS"]
@@ -376,14 +372,18 @@ class ServerTalker(object):
             if prev[1] == 1: 
                 beta = (prev[0] + z_hat)/(self.connections)
                 del self.estimates[chrom]
+                self.iters[chrom] = self.iters[chrom] + 1:
+                    if self.iters[chrom] == self.max_iters:
+                        write_or_replace(self.store, chrom + "/results", beta)
+                        return
                 self.server.message(encode({"TASK": Commands.ASSO, 
                   "SUBTASK": None, "CHROM": chrom, "VALS": beta}))
             else:
                 self.estimates[chrom] = [prev[0] + z_hat , prev[1]-1]
+
         else: # Not in dictionary yet
             self.estimates[chrom] = [z_hat, self.connections - 1]
+            self.iters[chrom] = 1
 
 if __name__=='__main__':
    print("no commands here yet. Test using WTCCC_run.py")
-
-

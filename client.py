@@ -27,7 +27,6 @@ class MyClient(protocol.Protocol):
         print("connected!")
         self.factory.clients.append(self)
         print("clients are ", self.factory.clients)
-
         self.cdispatcher = clientSideAnalysis.ServerTalker(plink, 
             local_scratch, self)
         self.wait_for_and_process_next_message()

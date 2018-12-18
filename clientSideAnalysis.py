@@ -19,7 +19,7 @@ import tqdm
 from corr import nancorr
 from settings import Settings, Commands, Options, QCOptions, PCAOptions, QCFilterNames, PCAFilterNames
 from optimizationAux import *
-from utils import encode, decode
+from utils import encode, decode, write_or_replace
 
 
 class ServerTalker(object):
@@ -70,18 +70,15 @@ class ServerTalker(object):
             store.attrs['has_global_AF'] = False
             store.attrs['has_centering'] = False
             store.attrs['has_normalization'] = False
-            dset = store.require_dataset('meta/Status'
-                , (n_tot,), dtype=np.int8)
-            dset[:,] = [sample_list[i].affection for i in range(n_tot)]
-            # Ids
-            dset = store.require_dataset('meta/id', (n_tot,), dtype='S11')
-            dset[:,] = [sample_list[i].iid.encode('utf8') for i in range(n_tot)]
+            affection = [sample.affection for sample in sample_list]
+            write_or_replace(store, 'meta/Status', affection, np.int8)
+            ids = [sample.iid.encode('utf8') for sample in sample_list]
+            write_or_replace(store, 'meta/id', ids, 'S11')
+            del ids, affection
             # Read Demographic file
-            dem_file = plinkName + ".ind"
-            with open(dem_file, 'r') as dem_f: 
-                dset = store.require_dataset('meta/regions', (n_tot,)
-                    , dtype='S19')
-                dset[:,] = ["DatRegion".encode('utf8') for i in range(n_tot)]
+            with open(plinkName + ".ind", 'r') as dem_f: 
+                dem = [(row.split(",")[2]).encode("UTF8") for row in dem_f]
+                write_or_replace(store, 'meta/regions', dem)
             # Read chromosome data
             current_chr = 1
             positions = []
@@ -93,10 +90,8 @@ class ServerTalker(object):
                     if len(positions) == 0:
                         del store[str(current_chr)]
                     else:
-                        dset = current_group.require_dataset('positions',
-                            (len(positions),), dtype=np.uint32) 
-                        positions = np.array(positions, dtype=np.uint32)
-                        dset[:] = np.array(positions, dtype=np.uint32)
+                        write_or_replace(current_group, 'positions', positions,
+                            dtype=np.uint)
                         msg = encode({"TASK": "INIT", "SUBTASK": "POS",
                             "CHROM": current_chr, "POS": positions})
                         self.server.message(msg)
@@ -107,28 +102,24 @@ class ServerTalker(object):
                     current_group = store.require_group(str(current_chr))
                 genotypes[:] = np.array(row, dtype=np.float32)
                 pos = str(locus.bp_position)
-                dset = current_group.require_dataset(pos, (n_tot,), dtype=np.float32)
+                dset = current_group.require_dataset(pos, (n_tot,),
+                    dtype=np.float32)
                 positions.append(pos)
                 dset.attrs['rsid'] = locus.name
-                dset.attrs['snp']  = locus.allele1
-                dset.attrs['alt']  = locus.allele2
-                #vals, counts = np.unique(genotypes, return_counts=True)
-                #dset.attrs['counts'] = np.array([counts[i] for i in 
-                    #range(len(vals)) if vals[i] != 0], dtype=np.int32)
-                dset.attrs['counts'] = np.array([np.sum(genotypes==1), np.sum(genotypes==2), np.sum(genotypes==3)] , dtype=np.int32)
-                genotypes[genotypes == 3] = np.nan
-                dset[:] = genotypes 
-                
+                dset.attrs['snp'] = locus.allele1
+                dset.attrs['alt'] = locus.allele2
+                dset.attrs['counts'] = np.array([np.sum(genotypes==1), 
+                  np.sum(genotypes==2), np.sum(genotypes==3)], dtype=np.int32)
+                genotypes[genotypes==3] = np.nan
+                dset[:] = genotypes
             if locus.chromosome != 23:
-                dset = current_group.require_dataset('positions',
-                    (len(positions),), dtype=np.uint32) 
-                dset[:] = np.array(positions, dtype=np.uint32)
+                write_or_replace(current_group, 'positions', positions,
+                    np.uint32)
                 msg = {"TASK": "INIT", "SUBTASK": "POS",
                     "CHROM": current_chr, "POS": positions}
                 self.server.message(encode(msg))
 
-    def dispatch(self,message):
-        message = message
+    def dispatch(self, message):
         task = message["TASK"]
         subtask = message["SUBTASK"]
         if self.verbose:
@@ -162,7 +153,6 @@ class ServerTalker(object):
                     self.r0, self.r1 = None, None
             if subtask == "PCS":
                 self.compute_Us(message)
-
         elif task == Commands.ASSO:
             if self.covariates is None:
                 self.load_covariates(message)
@@ -172,7 +162,7 @@ class ServerTalker(object):
         with h5py.File(self.store_path, 'a') as store: 
             for chrom in self.chroms:
                 group = store[chrom]
-                if center: 
+                if center:
                     af = group["MAF"].value
                 if scale:
                     sd = np.sqrt(group["VAR"].value)
@@ -183,7 +173,7 @@ class ServerTalker(object):
                         vals = genotypes.value
                         vals[np.isnan(vals)] = 2*af[i]
                         genotypes[:] = vals - 2*af[i]
-                    if scale: 
+                    if scale:
                         genotypes[:] = genotypes[:] / sd[i]
                         store.attrs["has_normalization"] = True
 
@@ -234,8 +224,7 @@ class ServerTalker(object):
                 countDict["COUNTS"] = np.array(count_arr, dtype=np.uint32)
                 if chrom == keys[-1]:
                     countDict["END"] = True
-                msg = encode(countDict)
-                self.server.message(msg)
+                self.server.message(encode(countDict))
                 countDict = {}
 
 #################################### QC #######################################
@@ -254,18 +243,14 @@ class ServerTalker(object):
 
         def replace_dataset(tokeep, dset_name, return_deleted=False):
             vals = group[dset_name].value
-            del group[dset_name]
             remaining = vals[tokeep]
-            deleted   = vals[np.logical_not(tokeep)]
-            if dset_name in group:
-                del group[dset_name]
-            group.create_dataset(dset_name, data=remaining)
+            deleted = vals[np.logical_not(tokeep)]
+            write_or_replace(group, dset_name, remaining)
             if return_deleted:
                 return deleted
 
-
         filter_list = message["FILTERS"]
-        value_list   = message["VALS"]
+        value_list = message["VALS"]
         with h5py.File(self.store_path, 'a') as store:
             if self.chroms is None:
                 self.chroms = [i for i in store.keys() if i != "meta"]
@@ -470,8 +455,6 @@ class ServerTalker(object):
                 msg = self._run_logistic_regression(chrom, self.ncov,  None)
         self.server.message(msg)
 
-      
-
     def _run_logistic_regression(self, chrom, ncov, 
             warm_start=None, rho=10.0, alpha=1.0):
         # ASSUMES EVERYTHING IS CENTERED #TODO 
@@ -499,7 +482,6 @@ class ServerTalker(object):
                 else:
                     gval = group[str(position)].value/std[i]
                 covariates[:,0] = gval
-                
                 if warm_start is None:
                     estimates[:,i] = bfgs_more_gutted(covariates,
                         np.zeros((ncov, )), np.zeros((ncov,)),
@@ -515,7 +497,6 @@ class ServerTalker(object):
         return encode({"TASK": Commands.ASSO, "SUBTASK": chrom, 
           "CHROM": chrom, "VALS": z_hat})
 
+
 if __name__=='__main__':
     print("no commands here yet. Test using WTCCC_run.py")
-
-
