@@ -332,23 +332,25 @@ class ServerTalker(object):
     def pca(self, chroms=None, n_components=10):
         if chroms is None: 
             chroms = sorted([v for v in self.store.keys() if v != 'meta'])
-            print(chroms)
         cov_size = 0
+        meta = self.store["meta"]
         for chrom in chroms: 
-            cov_size += self.store["meta/{}_{}".format(chrom, chrom)].shape[0]
+            cov_size += meta["{}_{}".format(chrom, chrom)].shape[0]
         print("Starting covariance matrix of size {} x {}".format(
             cov_size, cov_size))
         cov = np.empty((cov_size, cov_size))
-        i_old,j_old = 0, 0
-        for chrom1, chrom2 in itertools.product(chroms, chroms):
-            cov_name = "meta/{}_{}".format(chrom1, chrom2)
-            if cov_name in self.store:
-                usbcov = self.store[cov_name].value
-            else:
-                usbcov = self.store["meta/{}_{}".format(chrom2, chrom1)].value
-            i_new = i_old + usbcov.shape[0]
-            j_new = j_old + usbcov.shape[1]
-            cov[i_old:i_new, j_old:j_new] = usbcov
+        i_old = 0
+        for chrom1 in chroms:
+            j_old = 0
+            for chrom2 in chroms:
+                if chrom2 > chrom1: 
+                    break
+                cov_name = "{}_{}".format(chrom1, chrom2)
+                if cov_name in meta:
+                    pcov = meta[cov_name].value
+                cov[i_old:i_old+pcov.shape[0], j_old:j_old+pcov.shape[1]] = pcov
+                j_old += pcov.shape[1]
+            i_old += pcov.shape[0]
         cov += cov.T
         sigma, v = eig(cov, k=n_components, ncv=3*n_components)
         sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
@@ -372,10 +374,10 @@ class ServerTalker(object):
             if prev[1] == 1: 
                 beta = (prev[0] + z_hat)/(self.connections)
                 del self.estimates[chrom]
-                self.iters[chrom] = self.iters[chrom] + 1:
-                    if self.iters[chrom] == self.max_iters:
-                        write_or_replace(self.store, chrom + "/results", beta)
-                        return
+                self.iters[chrom] = self.iters[chrom] + 1
+                if self.iters[chrom] == self.max_iters:
+                    write_or_replace(self.store, chrom + "/results", beta)
+                    return
                 self.server.message(encode({"TASK": Commands.ASSO, 
                   "SUBTASK": None, "CHROM": chrom, "VALS": beta}))
             else:

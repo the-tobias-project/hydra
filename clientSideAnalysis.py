@@ -76,7 +76,7 @@ class ServerTalker(object):
             write_or_replace(store, 'meta/id', ids, 'S11')
             del ids, affection
             # Read Demographic file
-            with open(plinkName + ".ind", 'r') as dem_f: 
+            with open(plinkName + ".ind", 'r') as dem_f:
                 dem = [(row.split(",")[2]).encode("UTF8") for row in dem_f]
                 write_or_replace(store, 'meta/regions', dem)
             # Read chromosome data
@@ -368,6 +368,7 @@ class ServerTalker(object):
 
     def report_covariance(self, chroms, mask_name):
         print("reporting cov")
+        chroms = sorted(chroms)
         msg = {"TASK": "PCA", "SUBTASK": "COV"}
         with h5py.File(self.store_path, 'r') as store:
             n = store.attrs["n"]
