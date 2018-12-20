@@ -103,6 +103,34 @@ def corr(ndarray[float32_t, ndim=2] sumLin, ndarray[float32_t, ndim=2] sumSq,
         results[i,i] = 0.0 # obv this is 1 but this way testing is easier
     return results
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def process_plink_row(row, geno):
+    cdef:
+        int32_t missing, num_het, num_homo_alt
+        float32_t item
+        ndarray[int32_t, ndim=1] counts
+    counts = np.empty((3), dtype=np.int32)   
+    missing = 0
+    num_het = 0
+    num_homo_alt = 0
+    for i, item in enumerate(row):
+        if item == 3: 
+            missing += 1
+            geno[i] = np.nan
+            continue
+        if item == 1:
+            num_het += 1
+        elif item == 2:
+            num_homo_alt += 1
+        geno[i] = item
+    counts[0] = num_het
+    counts[1] = num_homo_alt
+    counts[2] = missing
+    return(counts, geno)
+            
+
+
 cdef extern from "plink2_stats.cpp":
   cpdef double HweP(int32_t obs_hets, int32_t obs_hom1, int32_t ob_hom2, uint32_t midp)
   #cpdef double HweP(ndarray[int32_t, ndim=1] obs_hets, ndarray[int32_t, ndim=1] obs_hom1,

@@ -4,7 +4,6 @@
 import time
 import sys
 import pdb
-import itertools
 import _pickle as pickle
 import os
 
@@ -16,12 +15,13 @@ from sklearn.utils.extmath import svd_flip
 import tqdm
 
 # Internal lib
-from corr import nancorr
+from corr import nancorr, process_plink_row
 from settings import Settings, Commands, Options, QCOptions, PCAOptions, QCFilterNames, PCAFilterNames
 from optimizationAux import *
 from utils import encode, decode, write_or_replace
 
 
+import cProfile, pstats, io
 class ServerTalker(object):
     """Dispatches commands from/to the server"""
     def __init__(self, store_name, scratch, server):
@@ -54,6 +54,7 @@ class ServerTalker(object):
 
     def plinkToH5(self):
         """Gets plink prefix, produces an HDF file with the same prefix"""
+        t = time.time()
         plinkName = self.store_name
         plink_file = plinkfile.open(plinkName)
         if not plink_file.one_locus_per_row():
@@ -63,8 +64,7 @@ class ServerTalker(object):
         sample_list = plink_file.get_samples()
         locus_list = plink_file.get_loci()
         n_tot = len(sample_list)
-        with h5py.File(self.store_path, 'w', libver='latest'
-                , swmr=True) as store:
+        with h5py.File(self.store_path, 'w', libver='latest') as store:
             store.attrs['n'] = len(sample_list)
             store.attrs['has_local_AF'] = False
             store.attrs['has_global_AF'] = False
@@ -82,42 +82,55 @@ class ServerTalker(object):
             # Read chromosome data
             current_chr = 1
             positions = []
+            rsids = []
+            allcounts = []
             current_group = store.require_group(str(current_chr))
             genotypes = np.zeros(n_tot, dtype=np.float32)
-            for locus in locus_list:
-                row = next(plink_file)
+            pr = cProfile.Profile()
+            pr.enable()
+            for locus, row in zip(locus_list, plink_file):
                 if locus.chromosome != current_chr: 
                     if len(positions) == 0:
                         del store[str(current_chr)]
                     else:
                         write_or_replace(current_group, 'positions', positions,
                             dtype=np.uint)
+                        write_or_replace(current_group, 'rsids', rsids)
+                        write_or_replace(current_group, 'counts', allcounts,
+                            np.uint32)
                         msg = encode({"TASK": "INIT", "SUBTASK": "POS",
                             "CHROM": current_chr, "POS": positions})
                         self.server.message(msg)
                         positions = []
+                        rsid = []
+                        allcounts = []
                     current_chr = locus.chromosome
                     if current_chr == 23:
                         break
                     current_group = store.require_group(str(current_chr))
-                genotypes[:] = np.array(row, dtype=np.float32)
                 pos = str(locus.bp_position)
-                dset = current_group.require_dataset(pos, (n_tot,),
-                    dtype=np.float32)
+                counts, geno = process_plink_row(row, genotypes)
+                dset = current_group.create_dataset(pos, data=geno)
+                rsids.append(locus.name.encode('utf8'))
                 positions.append(pos)
-                dset.attrs['rsid'] = locus.name
-                dset.attrs['snp'] = locus.allele1
-                dset.attrs['alt'] = locus.allele2
-                dset.attrs['counts'] = np.array([np.sum(genotypes==1), 
-                  np.sum(genotypes==2), np.sum(genotypes==3)], dtype=np.int32)
-                genotypes[genotypes==3] = np.nan
-                dset[:] = genotypes
+                #dset.attrs['snp'] = locus.allele1, locus.allele2
+                #dset.attrs['counts'] = counts
+                allcounts.append(counts)
             if locus.chromosome != 23:
                 write_or_replace(current_group, 'positions', positions,
                     np.uint32)
+                write_or_replace(current_group, 'rsids', rsids)
+                write_or_replace(current_group, 'counts', allcounts, np.uint32)
                 msg = {"TASK": "INIT", "SUBTASK": "POS",
                     "CHROM": current_chr, "POS": positions}
                 self.server.message(encode(msg))
+        print(time.time()-t)
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue(),  file=open("profile.txt", "a"))
 
     def dispatch(self, message):
         task = message["TASK"]
@@ -214,18 +227,14 @@ class ServerTalker(object):
                 countDict["TASK"] ="INIT"
                 countDict["SUBTASK"] = "COUNT"
                 countDict["CHROM"] = chrom
-                if chrom == 'meta':
-                    continue
-                positions = store["{}/positions".format(chrom)].value
-                count_arr = []
-                for i, pos in enumerate(positions):
-                    count_arr.append(store["{}/{}".format(chrom, 
-                        pos)].attrs["counts"])
-                countDict["COUNTS"] = np.array(count_arr, dtype=np.uint32)
+                count_arr = store["{}/counts".format(chrom)].value
+                countDict["COUNTS"] = count_arr
+                print(chrom, keys)
                 if chrom == keys[-1]:
                     countDict["END"] = True
                 self.server.message(encode(countDict))
                 countDict = {}
+                time.sleep(.2)
 
 #################################### QC #######################################
     def run_QC(self, message, remove=True):
