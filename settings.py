@@ -10,6 +10,7 @@ class Settings(object):
     kLargeEpsilon = 1e-07
     SMALL_EPSILON = 5.684341886080802e-14
     local_scratch = "/local/scratch/armin/Hydra"  # This should be stored in a more ephemeral location
+    python = "/srv/gsfs0/software/python/3.6.4/bin/python3"
 
 
 class Commands(object):

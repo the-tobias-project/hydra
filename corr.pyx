@@ -22,9 +22,6 @@ from numpy cimport (ndarray,
                     double_t)
 cnp.import_array()
 
-
-
-
 cdef float64_t FP_ERR = 1e-13
 
 cdef double NaN = <double> np.NaN
@@ -107,7 +104,7 @@ def corr(ndarray[float32_t, ndim=2] sumLin, ndarray[float32_t, ndim=2] sumSq,
 @cython.wraparound(False)
 def process_plink_row(row, geno):
     cdef:
-        int32_t missing, num_het, num_homo_alt
+        int32_t missing, num_het, num_homo_alt, i
         float32_t item
         ndarray[int32_t, ndim=1] counts
     counts = np.empty((3), dtype=np.int32)   
@@ -128,7 +125,6 @@ def process_plink_row(row, geno):
     counts[1] = num_homo_alt
     counts[2] = missing
     return(counts, geno)
-            
 
 
 cdef extern from "plink2_stats.cpp":

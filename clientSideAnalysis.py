@@ -54,7 +54,6 @@ class ServerTalker(object):
 
     def plinkToH5(self):
         """Gets plink prefix, produces an HDF file with the same prefix"""
-        t = time.time()
         plinkName = self.store_name
         plink_file = plinkfile.open(plinkName)
         if not plink_file.one_locus_per_row():
@@ -72,7 +71,7 @@ class ServerTalker(object):
             store.attrs['has_normalization'] = False
             affection = [sample.affection for sample in sample_list]
             write_or_replace(store, 'meta/Status', affection, np.int8)
-            ids = [sample.iid.encode('utf8') for sample in sample_list]
+            ids = [sample.iid for sample in sample_list]
             write_or_replace(store, 'meta/id', ids, 'S11')
             del ids, affection
             # Read Demographic file
@@ -86,8 +85,6 @@ class ServerTalker(object):
             allcounts = []
             current_group = store.require_group(str(current_chr))
             genotypes = np.zeros(n_tot, dtype=np.float32)
-            pr = cProfile.Profile()
-            pr.enable()
             for locus, row in zip(locus_list, plink_file):
                 if locus.chromosome != current_chr: 
                     if len(positions) == 0:
@@ -113,8 +110,6 @@ class ServerTalker(object):
                 dset = current_group.create_dataset(pos, data=geno)
                 rsids.append(locus.name.encode('utf8'))
                 positions.append(pos)
-                #dset.attrs['snp'] = locus.allele1, locus.allele2
-                #dset.attrs['counts'] = counts
                 allcounts.append(counts)
             if locus.chromosome != 23:
                 write_or_replace(current_group, 'positions', positions,
@@ -124,13 +119,6 @@ class ServerTalker(object):
                 msg = {"TASK": "INIT", "SUBTASK": "POS",
                     "CHROM": current_chr, "POS": positions}
                 self.server.message(encode(msg))
-        print(time.time()-t)
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue(),  file=open("profile.txt", "a"))
 
     def dispatch(self, message):
         task = message["TASK"]
@@ -216,6 +204,7 @@ class ServerTalker(object):
                 dset = chrom_group.create_dataset(task, data=vals)
 
     def reportCounts(self):
+        time.sleep(.1)
         """Report the counts (Het, homo Alt, missing)"""
         with h5py.File(self.store_path, 'r') as store:
             countDict = {}
@@ -224,17 +213,16 @@ class ServerTalker(object):
             keys = [i for i in store.keys() if i != 'meta']
             for chrom in keys:
                 countDict["n"] = int(n)
-                countDict["TASK"] ="INIT"
+                countDict["TASK"] = Commands.INIT
                 countDict["SUBTASK"] = "COUNT"
                 countDict["CHROM"] = chrom
                 count_arr = store["{}/counts".format(chrom)].value
                 countDict["COUNTS"] = count_arr
-                print(chrom, keys)
                 if chrom == keys[-1]:
                     countDict["END"] = True
                 self.server.message(encode(countDict))
                 countDict = {}
-                time.sleep(.2)
+                time.sleep(.1)
 
 #################################### QC #######################################
     def run_QC(self, message, remove=True):

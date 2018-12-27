@@ -33,7 +33,7 @@ class MyClient(protocol.Protocol):
 
     def clientConnectionLost(self, reason):
         # TODO send warning
-        self.factory.clients.remove(self)
+        return()
 
     def dataReceived(self, data):
         if self.cache is not None:

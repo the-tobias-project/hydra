@@ -37,7 +37,7 @@ class Hub(protocol.Protocol):
         while waiting_for_command:
             val = input(
                 "Looks like everyone is here. Type the stage you want to proceed with? Options: " + ", ".join(options)
-                + ": ")
+                + ": \n")
             val = val.upper()
             if val in options:
                 waiting_for_command = False
@@ -60,7 +60,7 @@ class Hub(protocol.Protocol):
         task = "QC"
         while True:
             val = input(
-                """Indicate the filters and corresponding values(e.g. hwe 1e-5). Available filters are HWE, MAF, MPS(Missing Per sample), MPN(Missing per snp), snp(rsid) (MPS not implemented yet): """)
+                """Indicate the filters and corresponding values(e.g. hwe 1e-5). Available filters are HWE, MAF, MPS(Missing Per sample), MPN(Missing per snp), snp(rsid) (MPS not implemented yet): \n""")
             val = val.upper()
             vals = val.split()
             if vals[0] == Commands.EXIT:
@@ -115,7 +115,8 @@ class Hub(protocol.Protocol):
         task = "PCA"
         while True:
             val = input(
-                """Specify filters for PCA pre-processing: (OPTIONS: HWE, MAF, MPS, as before as well as LD. e.g. maf 0.1 LD 50: """)
+                """Specify filters for PCA pre-processing: (OPTIONS: HWE, MAF,
+                MPS, as before as well as LD. e.g. maf 0.1 LD 50: """)
             vals = val.split()
             if val == Commands.EXIT:
                 sys.exit()
@@ -168,7 +169,6 @@ class Hub(protocol.Protocol):
         return
 
     def connectionLost(self, reason):  # TODO
-        self.factory.clients.remove(self)
         self.nclients -= 1
 
     def dataReceived(self, data):

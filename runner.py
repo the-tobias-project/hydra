@@ -1,6 +1,9 @@
 import sys
 from subprocess import Popen
 import shlex
+
+# Third party lib
+from settings import Settings
 PYTHON="/srv/gsfs0/software/python/3.6.4/bin/python3"
 
 def main(plinkList):
@@ -8,7 +11,7 @@ def main(plinkList):
   for plinkFile in plinkList:
     arguments = plinkFile 
     print (arguments)
-    processes.append(Popen(shlex.split(PYTHON + " client.py " + arguments)))
+    processes.append(Popen(shlex.split(Settings.python + " client.py " + arguments)))
   for p in processes:
     p.wait()
 
