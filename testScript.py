@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+
+# std lib
+import sys
+from subprocess import Popen, PIPE
+import shlex
+import time
+import os
+import shutil
+import glob
+import tempfile
+
+# Third party lib
+from termcolor import colored
+
+# In house Lib
+from settings import Settings
+from utils import snps_match
+
+import pdb
+
+def process_finished(message):
+    if message.startswith("Looks") or message.startswith("Indicate"):
+        return True
+    return False
+
+
+def wait_for_process_to_finish(server):
+    message = server.stdout.readline()
+    while not process_finished(message):
+        message = server.stdout.readline()
+
+
+def wait_for_client_to_finish(client, k):
+    k -= 1
+    while k:
+        print(k)
+        message = client.stdout.readline()
+        print(message)
+        k -= 1
+
+
+def startup_server_client():
+    server = Popen(shlex.split(Settings.python + " server.py"), stdin=PIPE, 
+        stdout=PIPE, bufsize=1, universal_newlines=True, preexec_fn=os.setpgrp)
+    client = Popen(shlex.split(Settings.python + " runner.py"), preexec_fn=os.setpgrp
+        , stderr=PIPE, bufsize=1, universal_newlines=True)
+    message = server.stdout.readline()
+    wait_for_process_to_finish(server)
+    return server, client
+
+
+def copy_datasets(location):
+    files_to_copy = glob.iglob(os.path.join(Settings.local_scratch, '*.h5py'))
+    for f in files_to_copy:
+        shutil.copy(f, location)
+
+
+def test_init():
+    server, client = startup_server_client()
+    server.stdin.write('init\n')
+    print("initalized!")
+    wait_for_process_to_finish(server)
+    time.sleep(1)
+    server.stdin.write('exit\n')
+    server.stdin.close()
+    client.kill()
+    return snps_match('testData/subsampled', Settings.local_scratch+'/dset1.h5py')
+
+
+def run_plink(plink_cmd, inPlink, temp_fldr):
+    outname = os.path.join(temp_fldr, os.path.basename(inPlink))
+    full_cmd = "{plink} --bfile {plink_file} {cmd} --make-bed --out {outname}".format(
+        plink=Settings.plink, plink_file=inPlink, cmd=plink_cmd, outname=outname)
+    print("Running plink command")
+    plink_running = Popen(shlex.split(full_cmd), stdin=PIPE, stdout=PIPE)
+    plink_running.wait()
+
+
+def qc_setup():
+    local_scratch = Settings.local_scratch
+    temp_location = tempfile.mkdtemp(prefix=local_scratch+"/")
+    copy_datasets(temp_location)
+    server, client = startup_server_client()
+    server.stdin.write('QC\n')
+    return temp_location, local_scratch, server, client
+
+
+def test_qc_hwe(threshold):
+    temp_location, local_scratch, server, client = qc_setup()
+    server.stdin.write('hwe {}\n'.format(threshold))
+    time.sleep(10)
+    plink_cmd = "--hwe {} midp".format(threshold)
+    run_plink(plink_cmd, 'testData/subsampled', temp_location)
+    plink_to_compare_to = os.path.join(temp_location, 'subsampled')
+    results = snps_match(plink_to_compare_to, temp_location+'/central.h5py')
+    shutil.rmtree(temp_location)
+    server.stdin.write('exit\n')
+    server.stdin.close()
+    return results
+
+
+def test_qc_maf(threshold):
+    temp_location, local_scratch, server, client = qc_setup()
+    server.stdin.write('maf {}\n'.format(threshold))
+    wait_for_process_to_finish(server)
+    time.sleep(2)
+    plink_cmd = "--maf {} ".format(threshold)
+    run_plink(plink_cmd, 'testData/subsampled', temp_location)
+    plink_to_compare_to = os.path.join(temp_location, 'subsampled')
+    results = snps_match(plink_to_compare_to, temp_location+'/central.h5py')
+    shutil.rmtree(temp_location)
+    server.stdin.write('exit\n')
+    return results
+
+
+def run_tests():
+    #assert test_init(), "Initialization failed"
+    #print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
+    assert test_qc_hwe(1e-5), "HWE failed"
+    print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
+    assert test_qc_maf(0.05), "MAF failed"
+    print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
+
+
+def main():
+    run_tests()
+
+
+if __name__ == '__main__':
+    main()
+

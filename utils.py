@@ -79,6 +79,7 @@ def snps_match(plinkName, store_name, position_dset=None):
     plink_file = plinkfile.open(plinkName)
     with h5py.File(store_name, 'r', libver='latest') as store:
         locus_list = plink_file.get_loci()
+        plink_file.close()
         plinkSet = set((l.chromosome, l.bp_position) for l in locus_list)
         len_plink = len(plinkSet)
         del locus_list
