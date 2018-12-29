@@ -16,7 +16,6 @@ from settings import Settings
 
 HOST = 'localhost'
 PORT = 9000
-local_scratch = Settings.local_scratch
 
 
 class MyClient(protocol.Protocol):
@@ -67,6 +66,10 @@ class MyClientFactory(protocol.ClientFactory):
 message_queue = DeferredQueue()
 if __name__=="__main__":
     plink = sys.argv[1]
+    if len(sys.argv) == 3:
+        local_scratch = sys.argv[2]
+    else:
+        local_scratch = Settings.local_scratch
 
     factory = MyClientFactory()
     reactor.connectTCP(HOST, PORT, factory)

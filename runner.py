@@ -4,18 +4,20 @@ import shlex
 
 # Third party lib
 from settings import Settings
-PYTHON="/srv/gsfs0/software/python/3.6.4/bin/python3"
 
-def main(plinkList):
+def main(plinkList, local_scratch):
   processes = []
   for plinkFile in plinkList:
-    arguments = plinkFile 
-    print (arguments)
+    arguments = "{} {}".format(plinkFile, local_scratch)
     processes.append(Popen(shlex.split(Settings.python + " client.py " + arguments)))
   for p in processes:
-    p.wait()
+    p.communicate()
 
 
 if __name__ == "__main__":
-  main(['testData/dset1', 'testData/dset2', 'testData/dset3'])
+  if len(sys.argv) == 2:
+    local_scratch = sys.argv[1]
+  else:
+    local_scratch = Settings.local_scratch
+  main(['testData/dset1', 'testData/dset2', 'testData/dset3'], local_scratch)
 

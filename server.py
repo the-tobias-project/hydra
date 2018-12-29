@@ -11,13 +11,12 @@ from twisted.internet.defer import DeferredQueue, inlineCallbacks
 
 # Internal lib
 from serverSideAnalysis import ServerTalker, decode
-from settings import Settings, Commands, Options, QCOptions, PCAOptions
+from settings import Settings, Commands, Options, QCOptions, PCAOptions, PCAFilterNames
 
 # TODO: graceful exit
 
 PORT = 9000
 NUM = 3
-local_scratch = Settings.local_scratch
 
 HELP_STRING = "HELP MEEEEE"
 
@@ -120,7 +119,7 @@ class Hub(protocol.Protocol):
             vals = val.split()
             if val == Commands.EXIT:
                 sys.exit()
-            if len(vals) < 2:
+            if len(vals) < 2 and vals[0] != PCAFilterNames.PCA_NONE:
                 print("Specify `filter value` pairs. PLEASEEEE!! REEEE!")
             else:
                 subtasks = [v.upper() for v in vals[::2]]
@@ -203,11 +202,15 @@ class HubFactory(protocol.Factory):
         protocol.factory = self
         return protocol
 
-
-print('Starting server...')
-factory = HubFactory(NUM)
-reactor.listenTCP(PORT, factory)
-print(f'Server listening on port {PORT}')
-factory.clients = []
-message_queue = DeferredQueue()
-reactor.run()
+if __name__== "__main__":
+    if len(sys.argv) == 2:
+        local_scratch = sys.argv[1]
+    else:
+        local_scratch = Settings.local_scratch
+    print('Starting server...')
+    factory = HubFactory(NUM)
+    reactor.listenTCP(PORT, factory)
+    print(f'Server listening on port {PORT}')
+    factory.clients = []
+    message_queue = DeferredQueue()
+    reactor.run()

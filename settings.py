@@ -37,6 +37,7 @@ class Options(object):
     MPI = "MPI"
     SNP = "snp"
     LD = "LD"
+    NONE = "NONE"
 
 
 class QCOptions(object):
@@ -55,7 +56,8 @@ class PCAOptions(object):
     MPI = Options.MPI
     SNP = Options.SNP
     LD = Options.LD
-    all_options = [HWE, MAF, MPS, MPI, SNP, LD]
+    NONE = Options.NONE
+    all_options = [HWE, MAF, MPS, MPI, SNP, LD, NONE]
 
 
 class QCFilterNames(object):
@@ -73,4 +75,5 @@ class PCAFilterNames(object):
     PCA_MPI = Options.MPI
     PCA_snp = Options.SNP
     PCA_LD = Options.LD
+    PCA_NONE = Options.NONE
 

@@ -5,7 +5,6 @@ import pdb
 import sys
 import os
 import time
-import itertools
 import _pickle as pickle
 
 # Third party lib
@@ -23,7 +22,6 @@ from utils import encode, decode, write_or_replace
 #TODO documentation
 # Careful here, eigh uses https://software.intel.com/en-us/mkl-developer-reference-c-syevr behind the hood
 # so it can be significantly slower 
-
 
 
 class ServerTalker(object):
@@ -55,6 +53,7 @@ class ServerTalker(object):
         subtask = message["SUBTASK"]
         self.subtask = subtask
         current_task = "{} {}".format(task, subtask)
+        print(current_task)
         if self.status != current_task:
             self.status = current_task
             self.report_status()
@@ -126,6 +125,7 @@ class ServerTalker(object):
                 self.count_stats()
                 self.server.run_QC()
 
+
     def count_stats(self):
         N = float(self.store.attrs["N"])
         task = "INIT"
@@ -156,6 +156,8 @@ class ServerTalker(object):
 ################################### QC #######################################
     def QC_filters(self, filter_list, value_list, prefix=None):
         for chrom in self.store.keys():
+            if chrom == 'meta':
+                continue
             group  = self.store[chrom]
             pos    = group['positions']
             counts = group['counts']
@@ -173,7 +175,8 @@ class ServerTalker(object):
             if QCFilterNames.QC_MPS in filter_list:
                 ind = filter_list.index(QCFilterNames.QC_MPS)
                 tokeep = np.logical_and(tokeep, mr.value < value_list[ind])
-            print("in chromosome {}, {} snps were deleted and {} snps remain".format(chrom, tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
+            print("in chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
+                tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
             # Delete or tag the filtered locations
             if prefix is None: 
                 pos_vals, counts_vals = pos.value[tokeep], counts.value[tokeep]
@@ -216,6 +219,8 @@ class ServerTalker(object):
 
     def PCA_filters(self, filter_list, value_list):
         ld_prune = False
+        if PCAFilterNames.PCA_NONE in filter_list:
+            return ld_prune
         if PCAFilterNames.PCA_LD in filter_list: 
             ld_prune = True
             ind = filter_list.index(PCAFilterNames.PCA_LD)
@@ -267,9 +272,9 @@ class ServerTalker(object):
                 while True:
                     #length_of_window = np.sum(tokeep[self.r0:end)
                     for i, snp1 in enumerate(unfiltered):
-                        if not snp1: # already filtered 
+                        if not snp1: # already filtered
                             continue
-                        else: 
+                        else:
                             for j in range(i+1,n):
                                 snp2 = unfiltered[j]
                                 if not snp2: # if it didn't pass the filters
@@ -278,7 +283,7 @@ class ServerTalker(object):
                                     if maf[i] > maf[j] * (1.0 + 
                                         Settings.kLargeEpsilon):
                                         unfiltered[i] = False
-                                    else: 
+                                    else:
                                         unfiltered[j] = False
                                     break
                     r2 = corr_tot[unfiltered,:][:,unfiltered]

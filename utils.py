@@ -98,6 +98,9 @@ def snps_match(plinkName, store_name, position_dset=None):
     return False
         
 
+def compare_pca(plinkPCA, store_name):
+    pass
+
 
 if __name__ == '__main__':
     np.random.seed(123)
