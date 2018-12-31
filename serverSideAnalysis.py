@@ -287,7 +287,7 @@ class ServerTalker(object):
                                 if not snp2: # if it didn't pass the filters
                                     continue
                                 elif corr_tot[i,j] ** 2 > thresh:
-                                    if maf[i] < (maf[j] * (1.0 + 
+                                    if maf[j] > (maf[i] * (1.0 + 
                                         Settings.kLargeEpsilon)):
                                         unfiltered[i] = False
                                     else:
