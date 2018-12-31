@@ -39,6 +39,7 @@ class ServerTalker(object):
         self.r0          = None # General, multipurpose registers
         self.r1, self.r2 = None, None
         self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
+        self.geno = None
         self.tqdm        = None
         self.estimates   = {}
         self.max_iters   = 50
@@ -73,15 +74,16 @@ class ServerTalker(object):
                 self.r0      = 0
                 if continue_to_ld_prune:
                     return
-                else:
-                    self.subtask = "PCA_POS"
-                    self.counter = 1
+#                else:
+#                    self.subtask = "PCA_POS"
+#                    self.counter = 1
             if self.subtask == "LD":
                 self.ld_filters(message)
             if self.subtask == "PCA_POS":
                 self.counter -= 1
                 if self.counter == 0: #NOTE I don't think this is neccessary
                     msg = {"TASK": self.task, "SUBTASK": self.subtask}
+                    self.update_pca_positions()
                     self.report_content("PCA_passed", msg)
                     self.counter = None
             if self.subtask == "COV":
@@ -93,14 +95,14 @@ class ServerTalker(object):
             self.run_logistic_regression(message)
 
     def store_positions(self, message):
-        chrom = message["CHROM"] 
+        chrom = message["CHROM"]
         positions = message["POS"]
         dsetname = "{}/positions".format(chrom)
         write_or_replace(self.store, dsetname, positions, np.uint32)
         print("{} loci in chromosome {}.".format(len(positions), chrom))
 
     def store_counts(self, message):
-        n = message["n"] 
+        n = message["n"]
         if "START" in message:
             if "N" not in self.store.attrs:
                 self.store.attrs["N"] = 0
@@ -243,7 +245,7 @@ class ServerTalker(object):
         self.counter -= 1
         msg = {"TASK":"PCA", "SUBTASK":"LD"}
         for key, val in message.items():
-            if key == "TASK" or key == "SUBTASK":
+            if key == "TASK" or key == "SUBTASK" or key == 'geno':
                 continue
             else:
                 if key in self.sumLin:
@@ -254,9 +256,13 @@ class ServerTalker(object):
                     self.sumLin[key] = val[0]
                     self.sumSq[key]  = val[1]
                     self.cross[key]  = val[2]
+                if self.geno is not None:
+                    self.geno = np.append(self.geno, message['geno'], axis=0)
+                else:
+                    self.geno = message['geno']
         if self.counter == 0: # Every report is in
             for key, val in message.items():
-                if key == "TASK" or key == "SUBTASK":
+                if key == "TASK" or key == "SUBTASK" or key == 'geno':
                     continue
                 corr_tot = corr(self.sumLin[key], self.sumSq[key],
                     self.cross[key])
@@ -267,6 +273,7 @@ class ServerTalker(object):
                 maf = self.store["{}/PCA_allele_freq".format(key)].value[
                     self.r0:end]
                 maf = maf[tokeep[self.r0:end]]
+                maf = np.minimum(maf, 1-maf)
                 n = maf.shape[0]
                 unfiltered = np.ones((n, ), dtype=bool)
                 while True:
@@ -280,8 +287,8 @@ class ServerTalker(object):
                                 if not snp2: # if it didn't pass the filters
                                     continue
                                 elif corr_tot[i,j] ** 2 > thresh:
-                                    if maf[i] > maf[j] * (1.0 + 
-                                        Settings.kLargeEpsilon):
+                                    if maf[i] < (maf[j] * (1.0 + 
+                                        Settings.kLargeEpsilon)):
                                         unfiltered[i] = False
                                     else:
                                         unfiltered[j] = False
@@ -293,15 +300,24 @@ class ServerTalker(object):
                 pca_passed = self.store["{}/PCA_passed".format(key)]
                 pca_passed[:] = tokeep
                 end = min(self.r1 + self.r0 + self.r2, len(tokeep))
-                if self.r1 + self.r0 >= len(tokeep):# 
-                    msg[key]="END"
+                if self.r2 + self.r0 >= len(tokeep) - 1:
+                    msg[key] = "END"
                 else:
                     msg[key] = tokeep[self.r0 + self.r2:end]
+            self.server.message(encode(msg))
             self.counter = self.connections
             self.r0 += self.r2
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
-            self.server.message(encode(msg))
+            self.geno = None
             self.tqdm.update(self.r2)
+
+    def update_pca_positions(self):
+        chroms = [v for v in self.store.keys() if v != 'meta']
+        for chrom in chroms:
+            group = self.store[chrom]
+            pca_pos = group["PCA_positions"].value
+            pca_passed = group["PCA_passed"].value
+            write_or_replace(group, "PCA_positions", pca_pos[pca_passed])
 
     def report_content(self, dset_name, msg):
         chroms = [v for v in self.store.keys() if v != 'meta']
@@ -363,6 +379,8 @@ class ServerTalker(object):
         sigma = np.array(sigma)
         sigma[sigma < 0] = 0
         sigma = np.sqrt(sigma)
+        self.store['meta'].create_dataset('Sigmas', data = sigma)
+        self.store['meta'].create_dataset('Vs', data = v)
         inv_sigma = sigma.copy()
         inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
         msg = {"TASK": "PCA", "SUBTASK":  "PCS", "ISIG":  inv_sigma, "V": v
