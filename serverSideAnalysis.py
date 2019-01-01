@@ -39,7 +39,6 @@ class ServerTalker(object):
         self.r0          = None # General, multipurpose registers
         self.r1, self.r2 = None, None
         self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
-        self.geno = None
         self.tqdm        = None
         self.estimates   = {}
         self.max_iters   = 50
@@ -256,10 +255,6 @@ class ServerTalker(object):
                     self.sumLin[key] = val[0]
                     self.sumSq[key]  = val[1]
                     self.cross[key]  = val[2]
-                if self.geno is not None:
-                    self.geno = np.append(self.geno, message['geno'], axis=0)
-                else:
-                    self.geno = message['geno']
         if self.counter == 0: # Every report is in
             for key, val in message.items():
                 if key == "TASK" or key == "SUBTASK" or key == 'geno':
@@ -308,7 +303,6 @@ class ServerTalker(object):
             self.counter = self.connections
             self.r0 += self.r2
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
-            self.geno = None
             self.tqdm.update(self.r2)
 
     def update_pca_positions(self):
