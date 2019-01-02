@@ -149,7 +149,7 @@ class ServerTalker(object):
                 if not self.chroms:
                     self.chroms = None
                     self.load_chroms()
-                    self.standardize_data(scale=False, center=True)
+                    self.standardize_data(scale=True, center=True)
                     self.report_covariance(self.chroms , "PCA_passed")
                     self.r0, self.r1 = None, None
             if subtask == "PCS":
@@ -160,6 +160,12 @@ class ServerTalker(object):
             self.run_logistic_regression(message)
 
     def standardize_data(self, scale=False, center=True):
+        def safe_div(g, sd):
+            if sd > 0:
+                return g/sd
+            else:
+                return 0
+
         with h5py.File(self.store_path, 'a') as store: 
             for chrom in self.chroms:
                 group = store[chrom]
@@ -175,7 +181,8 @@ class ServerTalker(object):
                         vals[np.isnan(vals)] = 2*af[i]
                         genotypes[:] = vals - 2*af[i]
                     if scale:
-                        genotypes[:] = genotypes[:] / sd[i]
+                        vals = genotypes.value
+                        genotypes[:] = safe_div(vals, sd[i])
                         store.attrs["has_normalization"] = True
 
     def load_chroms(self):
@@ -186,7 +193,7 @@ class ServerTalker(object):
         chrom = message["CHROM"]
         with h5py.File(self.store_path, 'a') as store: 
             chrom_group = store[str(chrom)]
-            if "MISS" in message: 
+            if "MISS" in message:
                 vals = message["MISS"]
                 task = "not_missing_per_snp"
                 dset = chrom_group.create_dataset(task, data=1-vals)
@@ -266,6 +273,7 @@ class ServerTalker(object):
                 print("After filtering, {} snps remain".format(np.sum(tokeep)))
                 if remove: # Delete what doesn't pass 
                     replace_dataset(tokeep, 'hwe')
+                    replace_dataset(tokeep, 'VAR')
                     replace_dataset(tokeep, 'MAF')
                     replace_dataset(tokeep, 'not_missing_per_snp')
                     deleted = replace_dataset(tokeep, 'positions', 
@@ -310,7 +318,6 @@ class ServerTalker(object):
                 n = 0
                 for chrom in self.chroms:
                     n = max(n, len(fp["{}/PCA_positions".format(chrom)]))
-
             print("LD pruning. This will take some time...")
             self.tqdm = tqdm.tqdm(total=n)
             self.verbose = False
@@ -355,8 +362,8 @@ class ServerTalker(object):
     def store_message(self, message, dset_name):
         for key, val in message.items():
             if key in ["TASK", "SUBTASK"]:
-              continue 
-            else: 
+              continue
+            else:
               with h5py.File(self.store_path, 'a') as store:
                   dset = store.require_dataset("{}/{}".format(key, dset_name),
                       val.shape, dtype = val.dtype)
@@ -371,14 +378,12 @@ class ServerTalker(object):
             n = store.attrs["n"]
             for i_ch1, ch1 in enumerate(chroms):
                 group = store[ch1]
-                pos   = group["PCA_positions"].value
-                mask  = group[mask_name].value
-                pos   = pos[mask]
-                g1     = np.empty((len(pos), n))
-
+                pos = group["PCA_positions"].value
+                mask = group[mask_name].value
+                pos = pos[mask]
+                g1 = np.empty((len(pos), n))
                 for i, snp1 in enumerate(pos):
                     g1[i, :] = group[str(snp1)].value
-
                 for i_ch2, ch2 in enumerate(chroms):
                     if i_ch2 > i_ch1:
                         break
@@ -392,6 +397,7 @@ class ServerTalker(object):
                     msg["CH1"] = ch1
                     msg["CH2"] = ch2
                     msg["MAT"] = g1.dot(g2).astype(np.float32)
+                    msg['geno'] = g1
                     if ch1 == chroms[-1] and ch2 == chroms[-1]:
                         msg["E"] = True
                     self.server.message(encode(msg))

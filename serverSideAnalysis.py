@@ -130,7 +130,6 @@ class ServerTalker(object):
     def count_stats(self):
         N = float(self.store.attrs["N"])
         task = "INIT"
-
         for chrom in self.store.keys():
             counts_dset = self.store["{}/counts".format(chrom)].value
             missing_rate = counts_dset[:,3] / float(N)
@@ -138,7 +137,7 @@ class ServerTalker(object):
                 "{}/missing_rates".format(chrom), data=missing_rate)
             af = (counts_dset[:,2] * 2 + counts_dset[:,1]).astype(float)
             af /= (np.sum(counts_dset[:,:3], axis=1)*2)
-            af = af #np.minimum(af, 1-af)
+            #af = np.minimum(af, 1-af)
             self.store.create_dataset("{}/allele_freq".format(chrom), data=af)
             var = counts_dset[:,0] * (2*af)**2 
             var += counts_dset[:,1] * (1-2*af)**2 
@@ -149,7 +148,7 @@ class ServerTalker(object):
             # Need to Recompile HWEP with uint32
             msg = {"TASK": task, "SUBTASK": "STATS", "CHROM": chrom
                 , "HWE": hwe, "MISS": missing_rate, "AF": af, "VAR": var}
-            time.sleep(1)
+            time.sleep(.1)
             self.server.message(encode(msg))
             hwe_dset = self.store.create_dataset("{}/hwe".format(chrom)
                 , data=hwe)

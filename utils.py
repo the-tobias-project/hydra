@@ -96,10 +96,15 @@ def snps_match(plinkName, store_name, position_dset=None):
     if len(plinkSet) == 0 and len_plink == 0:
         return True
     return False
-        
+
 
 def compare_pca(plinkPCA, store_name):
-    pass
+    with h5py.File(store_name, 'r') as store:
+        sigmas = store['meta/Sigmas'].value
+    with open(plinkPCA+'.eigenval', 'r') as vals_file:
+        plinkSigmas = vals_file.read().split()
+        plinkSigmas = np.array(plinkSigmas, dtype=float)
+        pdb.set_trace()
 
 
 if __name__ == '__main__':

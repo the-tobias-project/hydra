@@ -15,7 +15,7 @@ from termcolor import colored
 
 # In house Lib
 from settings import Settings
-from utils import snps_match
+from utils import snps_match, compare_pca
 
 import pdb
 
@@ -28,6 +28,8 @@ def process_finished(message):
 def wait_for_process_to_finish(server):
     message = server.stdout.readline()
     while not process_finished(message):
+        if message != '':
+            print(message)
         message = server.stdout.readline()
 
 
@@ -116,9 +118,9 @@ def test_qc_maf(threshold):
     return results
 
 
-def test_qc_mpn(threshold):
+def test_qc_mps(threshold):
     temp_location, server, client = qc_setup()
-    server.stdin.write('mpn {}\n'.format(threshold))
+    server.stdin.write('mps {}\n'.format(threshold))
     wait_for_process_to_finish(server)
     plink_cmd = "--geno {} --make-bed".format(threshold)
     run_plink(plink_cmd, 'testData/subsampled', temp_location)
@@ -140,30 +142,32 @@ def test_pca_ld_pruning(win, num_pcs):
     wait_for_process_to_finish(server)
     server.stdin.write('exit\n')
     server.stdin.close()
-    plink_cmd = "--maf 0.1 --indep-pairwise {} 25 0.2 --make-bed".format(win)
+    plink_cmd = "--maf 0.1 --indep-pairwise {} 25 0.2".format(win)
+    run_plink(plink_cmd, 'testData/subsampled', temp_location)
+    plink_cmd = "--extract {}/subsampled.prune.in --make-bed".format(
+        temp_location)
     run_plink(plink_cmd, 'testData/subsampled', temp_location)
     plink_to_compare_to = os.path.join(temp_location, 'subsampled')
-    wait_for_process_to_finish(server)
     ld_results = snps_match(plink_to_compare_to, temp_location+'/central.h5py', 
         'PCA_positions')
-    # Now we check theactual pcs
+    ## Now we check theactual pcs
     plink_cmd = "--pca {}".format(num_pcs)
+    plink_loc = temp_location+'/subsampled'
     run_plink(plink_cmd, temp_location+'/subsampled', temp_location)
-    wait_for_process_to_finish(server)
-    shutil.rmtree(temp_location)
+    compare_pca(plink_loc, temp_location+'/central.h5py')
     return ld_results, temp_location
 
 
 
 def run_tests():
     assert test_init(), "Initialization failed"
-    print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
-    assert test_qc_hwe(1e-5), "HWE failed"
-    print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
-    assert test_qc_maf(0.05), "MAF failed"
-    print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
-    assert test_qc_mpn(0.05), "Missing per snp failed"
-    print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
+    #print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
+    #assert test_qc_hwe(1e-5), "HWE failed"
+    #print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
+    #assert test_qc_maf(0.05), "MAF failed"
+    #print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
+    #assert test_qc_mps(0.05), "Missing per snp failed"
+    #print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
     results, pca_temp_location = test_pca_ld_pruning(50, 10)
     assert results, "LD pruning failed"
     print(colored("LD pruning test: ",'red'), colored(u'\u2713', 'red'))
