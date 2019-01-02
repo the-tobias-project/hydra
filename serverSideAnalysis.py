@@ -373,14 +373,15 @@ class ServerTalker(object):
         v = np.array(v)
         sigma = np.array(sigma)
         sigma[sigma < 0] = 0
-        sigma = np.sqrt(sigma)
-        self.store['meta'].create_dataset('Sigmas', data = sigma**2)
+        self.store['meta'].create_dataset('Sigmas', data = sigma)
         self.store['meta'].create_dataset('Vs', data = v)
+        sigma = np.sqrt(sigma) * np.sqrt(cov.shape[0])
         inv_sigma = sigma.copy()
         inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
-        msg = {"TASK": "PCA", "SUBTASK":  "PCS", "ISIG":  inv_sigma, "V": v
+        msg = {"TASK": "PCA", "SUBTASK": "PCS", "ISIG": inv_sigma, "V": v
             , "CHROMS": chroms}
         self.server.message(encode(msg))
+        time.sleep(0.1)
 
 ################################ ASSOCIATION ###################################
     def run_logistic_regression(self, message):

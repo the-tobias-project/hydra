@@ -98,17 +98,26 @@ def snps_match(plinkName, store_name, position_dset=None):
     return False
 
 
+
 def compare_pca(plinkPCA, store_name, dsets_list):
     with h5py.File(store_name, 'r') as store:
         sigmas = store['meta/Sigmas'].value
     with open(plinkPCA+'.eigenval', 'r') as vals_file:
         plinkSigmas = vals_file.read().split()
         plinkSigmas = np.array(plinkSigmas, dtype=float)
+        k = len(sigmas)
     sigmasMatch = np.isclose(sigmas, plinkSigmas, rtol=1e-4, atol=1e-6).all()
     del plinkSigmas, sigmas
-    with open(plinkPCA+'.eigenvec', 'r') as vecs_file:
-        vecs = vecs_file.read()
-        pdb.set_trace()
+    plinkVals = np.loadtxt(plinkPCA+'.eigenvec', usecols=range(2,2+k))
+    valsMatch = True
+    index_new, index_old = 0, 0
+    for dset in dsets_list:
+        with h5py.File(dset, 'r') as store:
+            vals = store['meta/pca_u'].value
+            index_new += vals.shape[0]
+            valsMatch * np.isclose(plinkVals[index_old:index_new,:], vals, rtol=1e-4, atol=1e-6).all()
+            index_old = index_new
+    return valsMatch * sigmasMatch
 
 
 if __name__ == '__main__':

@@ -140,6 +140,7 @@ def test_pca_ld_pruning(win, num_pcs):
     temp_location, server, client = qc_setup('pca')
     server.stdin.write('maf 0.1 hwe 1e-5 ld {}\n'.format(win))
     wait_for_process_to_finish(server)
+    time.sleep(1)
     server.stdin.write('exit\n')
     server.stdin.close()
     plink_cmd = "--maf 0.1 --hwe 1e-5 midp --indep-pairwise {} 25 0.2".format(win)
@@ -154,7 +155,7 @@ def test_pca_ld_pruning(win, num_pcs):
     plink_cmd = "--pca {}".format(num_pcs)
     plink_loc = temp_location+'/subsampled'
     run_plink(plink_cmd, temp_location+'/subsampled', temp_location)
-    dsets = [temp_location+'/dset1.h5py', temp_location+'/dset2.hpy', 
+    dsets = [temp_location+'/dset1.h5py', temp_location+'/dset2.h5py', 
         temp_location+'/dset3.h5py']
     compare_pca(plink_loc, temp_location+'/central.h5py', dsets)
     return ld_results, temp_location
