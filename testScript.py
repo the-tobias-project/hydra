@@ -138,11 +138,11 @@ def test_qc_mps(threshold):
 
 def test_pca_ld_pruning(win, num_pcs):
     temp_location, server, client = qc_setup('pca')
-    server.stdin.write('maf 0.1 ld {}\n'.format(win))
+    server.stdin.write('maf 0.1 hwe 1e-5 ld {}\n'.format(win))
     wait_for_process_to_finish(server)
     server.stdin.write('exit\n')
     server.stdin.close()
-    plink_cmd = "--maf 0.1 --indep-pairwise {} 25 0.2".format(win)
+    plink_cmd = "--maf 0.1 --hwe 1e-5 midp --indep-pairwise {} 25 0.2".format(win)
     run_plink(plink_cmd, 'testData/subsampled', temp_location)
     plink_cmd = "--extract {}/subsampled.prune.in --make-bed".format(
         temp_location)
@@ -154,20 +154,22 @@ def test_pca_ld_pruning(win, num_pcs):
     plink_cmd = "--pca {}".format(num_pcs)
     plink_loc = temp_location+'/subsampled'
     run_plink(plink_cmd, temp_location+'/subsampled', temp_location)
-    compare_pca(plink_loc, temp_location+'/central.h5py')
+    dsets = [temp_location+'/dset1.h5py', temp_location+'/dset2.hpy', 
+        temp_location+'/dset3.h5py']
+    compare_pca(plink_loc, temp_location+'/central.h5py', dsets)
     return ld_results, temp_location
 
 
 
 def run_tests():
     assert test_init(), "Initialization failed"
-    #print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
-    #assert test_qc_hwe(1e-5), "HWE failed"
-    #print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
-    #assert test_qc_maf(0.05), "MAF failed"
-    #print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
-    #assert test_qc_mps(0.05), "Missing per snp failed"
-    #print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
+    print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
+    assert test_qc_hwe(1e-5), "HWE failed"
+    print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
+    assert test_qc_maf(0.05), "MAF failed"
+    print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
+    assert test_qc_mps(0.05), "Missing per snp failed"
+    print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
     results, pca_temp_location = test_pca_ld_pruning(50, 10)
     assert results, "LD pruning failed"
     print(colored("LD pruning test: ",'red'), colored(u'\u2713', 'red'))

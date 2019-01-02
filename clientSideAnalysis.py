@@ -397,7 +397,6 @@ class ServerTalker(object):
                     msg["CH1"] = ch1
                     msg["CH2"] = ch2
                     msg["MAT"] = g1.dot(g2).astype(np.float32)
-                    msg['geno'] = g1
                     if ch1 == chroms[-1] and ch2 == chroms[-1]:
                         msg["E"] = True
                     self.server.message(encode(msg))

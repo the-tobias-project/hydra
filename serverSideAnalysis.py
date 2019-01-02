@@ -143,6 +143,7 @@ class ServerTalker(object):
             var += counts_dset[:,1] * (1-2*af)**2 
             var += counts_dset[:,2] * (2-2*af)**2
             var /= (N-counts_dset[:,3]) # 2*af*(1-af)
+            var = 2*af*(1-af)
             self.store.create_dataset("{}/var".format(chrom), data=var)
             hwe = hweP(counts_dset[:,:3].astype(np.int32), 1)
             # Need to Recompile HWEP with uint32
@@ -243,7 +244,7 @@ class ServerTalker(object):
         self.counter -= 1
         msg = {"TASK":"PCA", "SUBTASK":"LD"}
         for key, val in message.items():
-            if key == "TASK" or key == "SUBTASK" or key == 'geno':
+            if key == "TASK" or key == "SUBTASK":
                 continue
             else:
                 if key in self.sumLin:
@@ -256,7 +257,7 @@ class ServerTalker(object):
                     self.cross[key]  = val[2]
         if self.counter == 0: # Every report is in
             for key, val in message.items():
-                if key == "TASK" or key == "SUBTASK" or key == 'geno':
+                if key == "TASK" or key == "SUBTASK":
                     continue
                 corr_tot = corr(self.sumLin[key], self.sumSq[key],
                     self.cross[key])
@@ -363,16 +364,17 @@ class ServerTalker(object):
                 if cov_name in meta:
                     pcov = meta[cov_name].value
                 cov[i_old:i_old+pcov.shape[0], j_old:j_old+pcov.shape[1]] = pcov
+                cov[j_old:j_old+pcov.shape[1], i_old:i_old+pcov.shape[0]] = pcov.T
                 j_old += pcov.shape[1]
             i_old += pcov.shape[0]
-        cov += cov.T
+        cov /= (cov.shape[0])
         sigma, v = eig(cov, k=n_components, ncv=3*n_components)
         sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
         v = np.array(v)
         sigma = np.array(sigma)
         sigma[sigma < 0] = 0
         sigma = np.sqrt(sigma)
-        self.store['meta'].create_dataset('Sigmas', data = sigma)
+        self.store['meta'].create_dataset('Sigmas', data = sigma**2)
         self.store['meta'].create_dataset('Vs', data = v)
         inv_sigma = sigma.copy()
         inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
