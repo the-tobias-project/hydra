@@ -41,7 +41,8 @@ class ServerTalker(object):
         self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
         self.tqdm        = None
         self.estimates   = {}
-        self.max_iters   = 50
+        self.max_iters   = 3
+        self.finished    = set()
         self.iters       = {}
 
     def report_status(self):
@@ -73,9 +74,6 @@ class ServerTalker(object):
                 self.r0      = 0
                 if continue_to_ld_prune:
                     return
-#                else:
-#                    self.subtask = "PCA_POS"
-#                    self.counter = 1
             if self.subtask == "LD":
                 self.ld_filters(message)
             if self.subtask == "PCA_POS":
@@ -392,11 +390,17 @@ class ServerTalker(object):
             prev = self.estimates[chrom]
             if prev[1] == 1: 
                 beta = (prev[0] + z_hat)/(self.connections)
-                del self.estimates[chrom]
-                self.iters[chrom] = self.iters[chrom] + 1
+                self.iters[chrom] += 1
                 if self.iters[chrom] == self.max_iters:
                     write_or_replace(self.store, chrom + "/results", beta)
-                    return
+                    del self.estimates[chrom]
+                    self.finished.add(chrom)
+                    chroms = [key for key in self.store if key != 'meta']
+                    if len(self.finished) == len(chroms):
+                        print("We are all done with the regression")
+                        self.server.get_response(Commands.all_commands)
+                self.estimates[chrom] = [beta, self.connections - 1]
+                print(chrom, self.iters[chrom])
                 self.server.message(encode({"TASK": Commands.ASSO, 
                   "SUBTASK": None, "CHROM": chrom, "VALS": beta}))
             else:

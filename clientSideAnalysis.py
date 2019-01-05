@@ -69,7 +69,14 @@ class ServerTalker(object):
             store.attrs['has_global_AF'] = False
             store.attrs['has_centering'] = False
             store.attrs['has_normalization'] = False
-            affection = [sample.affection for sample in sample_list]
+            potential_pheno_file = plinkName+".pheno"
+            if os.path.isfile(plinkName+".pheno"):
+                with open(potential_pheno_file, 'r') as f:
+                    affection = np.loadtxt(potential_pheno_file, dtype=int, usecols=2)
+            else:
+                affection = [sample.affection for sample in sample_list]
+            if len(np.unique(affection)) > 2:
+                raise ValueError("phenotype is not binary. We only support binary for now")
             write_or_replace(store, 'meta/Status', affection, np.int8)
             ids = [sample.iid for sample in sample_list]
             write_or_replace(store, 'meta/id', ids, 'S11')
@@ -452,15 +459,15 @@ class ServerTalker(object):
             chrom = message["CHROM"]
             warm_start = message["VALS"]
             msg = self._run_logistic_regression(chrom, self.ncov, warm_start)
+            self.server.message(msg)
         else: # First iteration
             self.load_chroms()
             for chrom in self.chroms:
                 msg = self._run_logistic_regression(chrom, self.ncov,  None)
-        self.server.message(msg)
+                self.server.message(msg)
 
     def _run_logistic_regression(self, chrom, ncov, 
             warm_start=None, rho=10.0, alpha=1.0):
-        # ASSUMES EVERYTHING IS CENTERED #TODO 
         covariates = self.covariates
         with h5py.File(self.store_path, 'r') as store:
             group = store[chrom]
@@ -468,6 +475,8 @@ class ServerTalker(object):
             estimates = np.empty((ncov, len(positions))) # Can probably get away with float32 here
             estimates[:, -1] = 0
             is_standardized = store.attrs["has_normalization"]
+            if not store.attrs['has_normalization']:
+                self.standardize_data(scale=True, center=True)
             std = np.sqrt(group["VAR"])
             offset = 1
             if chrom in self.previous_estimates:
@@ -480,11 +489,7 @@ class ServerTalker(object):
                     estimates[:, i] = np.nan
                     offset += 1
                     continue
-                if is_standardized:
-                    gval = group[str(position)].value
-                else:
-                    gval = group[str(position)].value/std[i]
-                covariates[:,0] = gval
+                covariates[:,0] = group[str(position)].value
                 if warm_start is None:
                     estimates[:,i] = bfgs_more_gutted(covariates,
                         np.zeros((ncov, )), np.zeros((ncov,)),
