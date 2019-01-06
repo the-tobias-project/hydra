@@ -41,7 +41,7 @@ class ServerTalker(object):
         self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
         self.tqdm        = None
         self.estimates   = {}
-        self.max_iters   = 3
+        self.max_iters   = 5
         self.finished    = set()
         self.iters       = {}
 
@@ -342,7 +342,7 @@ class ServerTalker(object):
             return True
         return False
 
-    def pca(self, chroms=None, n_components=10):
+    def pca(self, chroms=None, n_components=4):
         if chroms is None: 
             chroms = sorted([v for v in self.store.keys() if v != 'meta'])
         cov_size = 0
@@ -384,8 +384,9 @@ class ServerTalker(object):
 ################################ ASSOCIATION ###################################
     def run_logistic_regression(self, message):
         chrom = message["CHROM"]
+        if chrom in self.finished:
+            return
         z_hat = message["VALS"]
-        beta = np.sum(z_hat, 1)[:,None]/self.connections
         if chrom in self.estimates:
             prev = self.estimates[chrom]
             if prev[1] == 1: 

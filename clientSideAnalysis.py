@@ -491,9 +491,9 @@ class ServerTalker(object):
                     continue
                 covariates[:,0] = group[str(position)].value
                 if warm_start is None:
-                    estimates[:,i] = bfgs_more_gutted(covariates,
-                        np.zeros((ncov, )), np.zeros((ncov,)),
-                        rho, estimates[:,i-offset], ncov)
+                    estimates[:,i] = bfgs_more_gutted(covariates, 
+                        np.zeros((ncov)), np.zeros((ncov,)), rho, 
+                        estimates[:,i-offset], ncov)
                     z_hat = alpha * estimates
                 else:
                     estimates[:,i] = bfgs_more_gutted(covariates,

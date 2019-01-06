@@ -15,7 +15,6 @@ from settings import Settings, Commands, Options, QCOptions, PCAOptions, PCAFilt
 
 # TODO: graceful exit
 
-PORT = 9000
 NUM = 3
 
 HELP_STRING = "HELP MEEEEE"
@@ -35,8 +34,8 @@ class Hub(protocol.Protocol):
         waiting_for_command = True
         while waiting_for_command:
             val = input(
-                "Looks like everyone is here. Type the stage you want to proceed with? Options: " + ", ".join(options)
-                + ": \n")
+                "Looks like everyone is here. Type the stage you want to proceed with? Options: " + 
+                ", ".join(options)+ ": \n")
             val = val.upper()
             if val in options:
                 waiting_for_command = False
@@ -203,8 +202,11 @@ class HubFactory(protocol.Factory):
         return protocol
 
 if __name__== "__main__":
-    if len(sys.argv) == 2:
+    PORT = 9000
+    if len(sys.argv) >= 2:
         local_scratch = sys.argv[1]
+        if len(sys.argv) == 3:
+            PORT = int(sys.argv[2])
     else:
         local_scratch = Settings.local_scratch
     print('Starting server...')

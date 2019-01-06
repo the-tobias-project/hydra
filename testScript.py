@@ -15,7 +15,7 @@ from termcolor import colored
 
 # In house Lib
 from settings import Settings
-from utils import snps_match, compare_pca
+from utils import snps_match, compare_pca, compare_regression
 
 import pdb
 
@@ -41,12 +41,12 @@ def wait_for_client_to_finish(client, k):
         client.stdout.flush()
 
 
-def startup_server_client(scratch=None):
+def startup_server_client(scratch=None, PORT=" 9000"):
     if scratch is None:
         scratch = Settings.local_scratch
-    server = Popen(shlex.split(Settings.python + " server.py " + scratch), stdin=PIPE, 
+    server = Popen(shlex.split(Settings.python + " server.py " + scratch + PORT), stdin=PIPE, 
         stdout=PIPE, bufsize=1, universal_newlines=True)
-    client = Popen(shlex.split(Settings.python + " runner.py " + scratch),
+    client = Popen(shlex.split(Settings.python + " runner.py " + scratch + PORT),
         bufsize=1, stdout=PIPE, stderr=DEVNULL, universal_newlines=True)
     message = server.stdout.readline()
     wait_for_process_to_finish(server)
@@ -141,8 +141,9 @@ def test_pca_ld_pruning(win, num_pcs):
     server.stdin.write('maf 0.1 hwe 1e-5 ld {}\n'.format(win))
     wait_for_process_to_finish(server)
     time.sleep(1)
-    server.stdin.write('exit\n')
+    server.stdin.write('exit')
     server.stdin.close()
+    client.terminate()
     plink_cmd = "--maf 0.1 --hwe 1e-5 midp --indep-pairwise {} 25 0.2".format(win)
     run_plink(plink_cmd, 'testData/subsampled', temp_location)
     plink_cmd = "--extract {}/subsampled.prune.in --make-bed".format(
@@ -157,23 +158,44 @@ def test_pca_ld_pruning(win, num_pcs):
     run_plink(plink_cmd, temp_location+'/subsampled', temp_location)
     dsets = [temp_location+'/dset1.h5py', temp_location+'/dset2.h5py', 
         temp_location+'/dset3.h5py']
-    compare_pca(plink_loc, temp_location+'/central.h5py', dsets)
-    return ld_results, temp_location
+    pca_results = compare_pca(plink_loc, temp_location+'/central.h5py', dsets)
+    return ld_results, pca_results, temp_location
 
+
+##### ASSOCIATION TESTS
+
+def test_ass(ncov, temp_dir):
+    server, client = startup_server_client(scratch=temp_dir, PORT=' 9002')
+    time.sleep(1)
+    server.stdin.write('Asso\n')
+    time.sleep(.1)
+    server.stdin.write('4\n') # 10 pcs
+    wait_for_process_to_finish(server)
+    server.stdin.write('exit')
+    server.stdin.close()
+    plinkName = 'testData/subsampled'
+    plink_cmd = "--pheno {} --logistic beta --allow-no-sex --covar {}".format(
+        plinkName+'.pheno', temp_dir+"/subsampled.eigenvec")
+    run_plink(plink_cmd, 'testData/subsampled', temp_dir)
+    time.sleep(15)
+    compare_regression(temp_dir+"/subsampled.assoc.logistic", temp_dir+'/central.h5py')
 
 
 def run_tests():
     assert test_init(), "Initialization failed"
-    print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
-    assert test_qc_hwe(1e-5), "HWE failed"
-    print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
-    assert test_qc_maf(0.05), "MAF failed"
-    print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
-    assert test_qc_mps(0.05), "Missing per snp failed"
-    print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
-    results, pca_temp_location = test_pca_ld_pruning(50, 10)
-    assert results, "LD pruning failed"
+    #print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
+    #assert test_qc_hwe(1e-5), "HWE failed"
+    #print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
+    #assert test_qc_maf(0.05), "MAF failed"
+    #print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
+    #assert test_qc_mps(0.05), "Missing per snp failed"
+    #print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
+    ld_results, pca_results, pca_temp_location = test_pca_ld_pruning(50, 4)
+    assert ld_results, "LD pruning failed"
     print(colored("LD pruning test: ",'red'), colored(u'\u2713', 'red'))
+    assert pca_results, "LD pruning failed"
+    print(colored("PCA pruning test: ",'red'), colored(u'\u2713', 'red'))
+    test_ass(4, pca_temp_location)
 
 
 def main():

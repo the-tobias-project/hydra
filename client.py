@@ -15,7 +15,6 @@ from serverSideAnalysis import decode
 from settings import Settings
 
 HOST = 'localhost'
-PORT = 9000
 
 
 class MyClient(protocol.Protocol):
@@ -66,8 +65,12 @@ class MyClientFactory(protocol.ClientFactory):
 message_queue = DeferredQueue()
 if __name__=="__main__":
     plink = sys.argv[1]
-    if len(sys.argv) == 3:
+    if len(sys.argv) >= 3:
         local_scratch = sys.argv[2]
+        if len(sys.argv) == 4:
+            PORT = int(sys.argv[3])
+        else:
+            PORT = 9000
     else:
         local_scratch = Settings.local_scratch
 

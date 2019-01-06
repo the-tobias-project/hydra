@@ -18,6 +18,7 @@ from operator import mul
 
 from scipy.special import expit
 
+import pdb
 #gemm = get_blas_funcs("dgemm", [X, Y])
 gemm = get_blas_funcs("gemm")
 umr_sum = umath.add.reduce
@@ -39,7 +40,6 @@ mult    = np.multiply
 #  'eCx': nb.f8[:,:], 'f': nb.f8, 'g': nb.f8[:,:], 'y':nb.f8[:,:]})
 def l2_log(x, C, z, u, rho, n):
   """ assumes C is an numpy array"""
-  x = x.reshape(n,1)
   v = sub(add(x,u), z)
   eCx = exp(dot(C,x))
 #  eCx = exp(gemm(alpha=1.0, a=C, b=x, trans_a=False, trans_b=False))
@@ -49,7 +49,8 @@ def l2_log(x, C, z, u, rho, n):
   return f, g
 
 def bfgs_update(C, u, z, rho, x0):
-  args = (C, z, u, rho) 
+  n = len(x0)
+  args = (C, z, u, rho,n) 
   # bfgs(func, x0, args, bounds, callback)
   return bfgs(l2_log, x0, args=args, bounds=None, callback=callback)
 
@@ -61,27 +62,15 @@ def bfgs_gutted(C, u, z, rho, x0):
       2.2204460492503131e-09, 1e-5, 1e-8, 15000, 15000, -1, None, 20)['x']
 
 def bfgs_more_gutted(C, u, z, rho, x, n):
-  max_iter = 15000
-#  fun = MemoizeJac(l2_log)
-#  jac = fun.derivative
-  m = 10
-#  epsilon = 1e-8
-#  pgtol = 1e-5
-#  factr = 1e-7#ftol / np.finfo(float).eps
-  x = x.ravel()
-#  def func_and_grad(x):
-#    f = fun(x, C, z, u, rho, n)
-#    g = jac(x, C, z, u, rho, n)
-#    return f, g
+  #max_iter = 15000
+  max_iter = 3000
   nbd = zeros(n, int32)
   low_bnd = zeros(n, float64)
   upper_bnd = zeros(n, float64)
 
-#  x = array(x0, float64)
-#  f = array(0.0, float64)
+  x = array(x, float64)
   f = 0.0
   g = zeros((n,), float64)
-#  wa = zeros(2*m*n + 5*n + 11*m*m + 8*m, float64)
   wa = zeros(20*n + 5*n + 1180, float64)
   iwa = zeros(3*n, int32)
   task = zeros(1, 'S60')
@@ -89,37 +78,27 @@ def bfgs_more_gutted(C, u, z, rho, x, n):
   lsave = zeros(4, int32)
   isave = zeros(44, int32)
   dsave = zeros(29, float64)
-  
-  
   task[:] = 'START'
 
   n_iterations = 0
   while 1:
-    setulb(m, x, low_bnd, upper_bnd, nbd, f, g, 1e-7,
+    setulb(10, x, low_bnd, upper_bnd, nbd, f, g, 1e-7,
         1e-5, wa, iwa, task, -1, csave, lsave,isave, dsave, 20)
-    #task_str = task.tostring()
-#    if task_str.startswith(b'FG'):
-    task_str = task[0][:2]
-    if task_str == 'FG':
-      # reduce call time put the code here 
-      y = x.reshape(n,1)
-      v = sub(add(y,u),z)
-      eCx = exp(dot(C,y))
+    task_str = task.tostring()
+    if task_str.startswith(b'FG'):
+      v = sub(add(x,u),z)
+      eCx = exp(dot(C,x))
       rhov = rho * v
-#      fobj = umr_sum(log1p(eCx), None, None, None, False) 
-#      f = fobj + 0.5 * umr_sum(mul(rhov,v), None, None, None, False)
       f = umr_sum(log1p(eCx), None, None, None, False) + 0.5 * umr_sum(mul(rhov,v), None, None, None, False)
       g = dot(C.T, div(eCx, (add(1, eCx)))) + rhov
-    elif task_str == 'NE':
-#    elif task_str.startswith(b'NEW_X'):
+    elif task_str.startswith(b'NE'):
       n_iterations += 1
       if n_iterations >= max_iter:
         return x
     else:
       return x
-      #break
-  
-  
+
+
 def shrinkage(a, kappa):
   return maximum(0, a - kappa) - maximum(0, -a - kappa)
 
