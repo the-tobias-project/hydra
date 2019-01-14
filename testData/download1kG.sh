@@ -1,3 +1,4 @@
+python="/srv/gsfs0/software/python/3.6.4/bin/python3"
 wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz
 
 wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr21.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz
@@ -41,7 +42,9 @@ mv xac dset3.ind
 
 rm merged.dem
 
-
+$python utils.py
+# change phenotype to 0,1 
+grep -v '^#' subsampled.pheno | awk '{if($3==1)$3=0; if($3==2)$3=1; print;}' | split -l 900
 
 
 
