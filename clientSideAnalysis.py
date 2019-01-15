@@ -13,6 +13,7 @@ import numpy as np
 from plinkio import plinkfile
 from sklearn.utils.extmath import svd_flip
 import tqdm
+from sklearn.linear_model import LogisticRegression as LR
 
 # Internal lib
 from corr import nancorr, process_plink_row
@@ -152,11 +153,12 @@ class ServerTalker(object):
                 if self.chroms is None:
                     self.load_chroms()
                 chrom = self.store_message(message, "PCA_passed")
+                self.update_passed(chrom)
                 self.chroms.remove(chrom)
                 if not self.chroms:
                     self.chroms = None
                     self.load_chroms()
-                    self.standardize_data(scale=True, center=True)
+                    #self.standardize_data(scale=True, center=True)
                     self.report_covariance(self.chroms , "PCA_passed")
                     self.r0, self.r1 = None, None
             if subtask == "PCS":
@@ -302,6 +304,7 @@ class ServerTalker(object):
                         group.create_dataset("PCA_passed", 
                             data=np.ones(np.sum(tokeep), dtype=bool))
                         positions = group['positions'].value[tokeep]
+                        group.create_dataset("PCA_mask", data=tokeep, dtype=bool)
                         group.create_dataset("PCA_positions", data=positions)
 
 #################################### PCA ######################################
@@ -365,6 +368,16 @@ class ServerTalker(object):
         self.server.message(encode(msg))
         self.r3 += self.r2
         self.tqdm.update(self.r2)
+    
+    def update_passed(self, chrom):
+        with h5py.File(self.store_path, 'a') as store:
+            mask = store["{}/PCA_mask".format(chrom)]
+            pcmask = mask.value
+            pcmask[pcmask] = store["{}/PCA_passed".format(chrom)].value
+            mask[:] = pcmask
+            del store["{}/PCA_passed".format(chrom)]
+
+
 
     def store_message(self, message, dset_name):
         for key, val in message.items():
@@ -378,6 +391,14 @@ class ServerTalker(object):
               return key
 
     def report_covariance(self, chroms, mask_name):
+        def standardize_mat(mat, af, sd):
+            af = 2 * af.reshape(af.shape[0], 1)
+            mat -= af
+            ind = sd>0
+            mat[ind, :] /= sd[ind].reshape(np.sum(ind),1)
+            mat[np.isnan(mat)] = 0
+            return mat
+
         print("reporting cov")
         chroms = sorted(chroms)
         msg = {"TASK": "PCA", "SUBTASK": "COV"}
@@ -385,22 +406,26 @@ class ServerTalker(object):
             n = store.attrs["n"]
             for i_ch1, ch1 in enumerate(chroms):
                 group = store[ch1]
-                pos = group["PCA_positions"].value
-                mask = group[mask_name].value
-                pos = pos[mask]
+                tokeep = group['PCA_mask'].value
+                pos = group["positions"].value[tokeep]
+                af1 = group["MAF"].value[tokeep]
+                sd1 = np.sqrt(group["VAR"].value[tokeep])
                 g1 = np.empty((len(pos), n))
                 for i, snp1 in enumerate(pos):
                     g1[i, :] = group[str(snp1)].value
+                g1 = standardize_mat(g1, af1, sd1)
                 for i_ch2, ch2 in enumerate(chroms):
                     if i_ch2 > i_ch1:
                         break
                     group = store[ch2]
-                    pos   = group["PCA_positions"].value
-                    mask  = group[mask_name].value
-                    pos   = pos[mask]
+                    tokeep = group['PCA_mask'].value
+                    af2 = group["MAF"].value[tokeep]
+                    sd2 = np.sqrt(group["VAR"].value[tokeep])
+                    pos   = group["positions"].value[tokeep]
                     g2     = np.empty((n, len(pos)))
                     for i, snp2 in enumerate(pos):
                         g2[:, i] = group[str(snp2)].value
+                    g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
                     msg["CH1"] = ch1
                     msg["CH2"] = ch2
                     msg["MAT"] = g1.dot(g2).astype(np.float32)
@@ -417,14 +442,14 @@ class ServerTalker(object):
             pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
             n = 0
             for chrom in chroms: 
-                n += np.sum(store["{}/PCA_passed".format(chrom)])
+                n += np.sum(store["{}/PCA_mask".format(chrom)])
             num_inds = store.attrs["n"]
             arr = np.empty((num_inds, n))
             offset = 0
             for chrom in chroms:
                 group = store[str(chrom)]
-                tokeep    = group["PCA_passed"].value
-                positions = group["PCA_positions"].value[tokeep]
+                tokeep    = group["PCA_mask"].value
+                positions = group["positions"].value[tokeep]
                 for i, position in enumerate(positions): 
                     arr[:, offset+i] = group[str(position)].value
                 offset += i
@@ -445,16 +470,18 @@ class ServerTalker(object):
             if self.Ys is None:
                 self.Ys = np.sign(store["meta/Status"].value 
                     - 0.5).reshape(n, 1)
-            self.covariates = np.empty((n,vals[0] + len(vals)))
-            if vals[0] > 0: # Load up scores 
-                scores = store["meta/pca_u"].value[:,:vals[0]]
-                scores /= np.std(scores, axis = 0)
-                self.covariates[:,1:vals[0]+1] = scores  # already centered 
-                self.covariates[:,1:] *= -self.Ys
+            self.covariates = np.empty((n,vals[0] + len(vals) + 1))
+            # Load up scores 
+            scores = store["meta/pca_u"].value[:,:vals[0]]
+            scores /= np.std(scores, axis = 0)  # This needs to be the global std
+            self.covariates[:,2:vals[0]+1] = -self.Ys * scores  # already centered 
+            #self.covariates[:,2:] *= -self.Ys
+            #self.covariates[:,2:] *= -self.Ys
+            self.covariates[:,0] = -self.Ys.reshape(-1)
 
     def run_logistic_regression(self, message):
         if "VARS" in message:
-            self.ncov = message["VARS"][0] + 1 #Number of Pcs plus the snp 
+            self.ncov = message["VARS"][0] + 2 #Number of Pcs plus the intercept, coef
         if "CHROM" in message:
             chrom = message["CHROM"]
             warm_start = message["VALS"]
@@ -467,18 +494,22 @@ class ServerTalker(object):
                 self.server.message(msg)
 
     def _run_logistic_regression(self, chrom, ncov, 
-            warm_start=None, rho=10.0, alpha=1.0):
+            warm_start=None, rho=10, alpha=1.0):
         covariates = self.covariates
         with h5py.File(self.store_path, 'r') as store:
+            n = store.attrs["n"]
             group = store[chrom]
+            y = self.Ys.reshape(n)
             positions = group["positions"]
-            estimates = np.empty((ncov, len(positions))) # Can probably get away with float32 here
+            estimates = np.zeros((ncov, len(positions))) # Can probably get away with float32 here
             estimates[:, -1] = 0
-            is_standardized = store.attrs["has_normalization"]
-            if not store.attrs['has_normalization']:
-                self.standardize_data(scale=True, center=True)
+#            fake_estimates = np.empty((ncov, len(positions)))
+#            is_standardized = store.attrs["has_normalization"]
+#            estimates = estimates[0,:].reshape(-1,1)
+#            if not store.attrs['has_normalization']:
+#                self.standardize_data(scale=True, center=True)
             std = np.sqrt(group["VAR"])
-            offset = 1
+            #offset = 1
             if chrom in self.previous_estimates:
                 z_hat = self.previous_estimates[chrom]
                 all_Us     = self.previous_Us[chrom] + z_hat - warm_start
@@ -487,19 +518,24 @@ class ServerTalker(object):
             for i, position in enumerate(positions):
                 if std[i] == 0:
                     estimates[:, i] = np.nan
-                    offset += 1
+                #    offset += 1
                     continue
-                covariates[:,0] = group[str(position)].value
+                covariates[:,1] = group[str(position)].value * -y
+#                covariates = group[str(position)].value * -y
+#                covariates = covariates.reshape(-1,1)
+#                ncov = 1
+#                model = LR(fit_intercept=True, C = 10000, solver='lbfgs')
+#                model.fit(group[str(position)].value.reshape(-1,1), y)
+#                fake_estimates[:,i] = model.intercept_, model.coef_
                 if warm_start is None:
-                    estimates[:,i] = bfgs_more_gutted(covariates, 
-                        np.zeros((ncov)), np.zeros((ncov,)), rho, 
-                        estimates[:,i-offset], ncov)
+                    #estimates[i] = bfgs_more_gutted(covariates, np.zeros((ncov)), np.zeros((ncov,)), rho, estimates[i], ncov)
+                    estimates[:,i] = bfgs_more_gutted(covariates, np.zeros((ncov)), np.zeros((ncov,)), rho, estimates[:,i], ncov)
                     z_hat = alpha * estimates
                 else:
                     estimates[:,i] = bfgs_more_gutted(covariates,
                         all_Us[:,i] , warm_start[:,i], rho, z_hat[:, i], ncov)
                     z_hat = alpha * estimates + (1-alpha) * warm_start
-                offset = 1
+                #offset = 1
         self.previous_estimates[chrom] = estimates
         self.previous_Us[chrom] = all_Us
         return encode({"TASK": Commands.ASSO, "SUBTASK": chrom, 
