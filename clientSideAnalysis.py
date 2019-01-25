@@ -3,9 +3,10 @@
 # stdlib
 import time
 import sys
-import pdb
 import _pickle as pickle
 import os
+import logging
+import pdb
 
 # Third party lib
 import h5py
@@ -13,6 +14,7 @@ import numpy as np
 from plinkio import plinkfile
 from sklearn.utils.extmath import svd_flip
 import tqdm
+from sklearn.metrics import log_loss
 from sklearn.linear_model import LogisticRegression as LR
 
 # Internal lib
@@ -43,8 +45,10 @@ class ServerTalker(object):
         self.verbose = True
         self.covariates = None
         self.Ys = None
+        self.cov_likelihood = None
         self.previous_estimates = {}
         self.previous_Us = {}
+        self.logger = logging.getLogger(__name__)
 
     def _store_path(self):
         plinkName = self.store_name
@@ -132,12 +136,12 @@ class ServerTalker(object):
         task = message["TASK"]
         subtask = message["SUBTASK"]
         if self.verbose:
-            print("Working on:", task)
+            self.logger.info("Working on: {}".format(task))
         self.status = "{}/{}".format(task, subtask) 
         if task == Commands.INIT:
             if subtask == "STORE":
                 self.plinkToH5()
-                print("preparing counts")
+                self.logger.info("preparing counts")
                 self.reportCounts()
             if subtask == "STATS":
                 self.store_stats(message)
@@ -279,7 +283,7 @@ class ServerTalker(object):
                     ind = filter_list.index(QCFilterNames.QC_MPS)
                     value_list[ind] = 1 - value_list[ind]
                 tokeep  = find_what_passes(QCFilterNames.QC_MPS, "not_missing_per_snp", tokeep)
-                print("After filtering, {} snps remain".format(np.sum(tokeep)))
+                self.logger.info("After filtering, {} snps remain".format(np.sum(tokeep)))
                 if remove: # Delete what doesn't pass 
                     replace_dataset(tokeep, 'hwe')
                     replace_dataset(tokeep, 'VAR')
@@ -309,7 +313,7 @@ class ServerTalker(object):
 
 #################################### PCA ######################################
     def run_snp_filters(self, message):
-        print("Preparing for PCA")
+        self.logger.info("Preparing for PCA")
         filters = message["FILTERS"]
         vals    = message["VALS"]
         if PCAFilterNames.PCA_LD in filters: 
@@ -328,7 +332,7 @@ class ServerTalker(object):
                 n = 0
                 for chrom in self.chroms:
                     n = max(n, len(fp["{}/PCA_positions".format(chrom)]))
-            print("LD pruning. This will take some time...")
+            self.logger.info("LD pruning. This will take some time...")
             self.tqdm = tqdm.tqdm(total=n)
             self.verbose = False
             self.run_ld({})
@@ -399,7 +403,7 @@ class ServerTalker(object):
             mat[np.isnan(mat)] = 0
             return mat
 
-        print("reporting cov")
+        self.logger.info("reporting cov")
         chroms = sorted(chroms)
         msg = {"TASK": "PCA", "SUBTASK": "COV"}
         with h5py.File(self.store_path, 'r') as store:
@@ -482,19 +486,41 @@ class ServerTalker(object):
     def run_logistic_regression(self, message):
         if "VARS" in message:
             self.ncov = message["VARS"][0] + 2 #Number of Pcs plus the intercept, coef
-        if "CHROM" in message:
+        if "Threshold" in message:
+            self.threshold = message["Threshold"]
+            self.logger.info(self.threshold)
+        if self.cov_likelihood is None:
+            if self.pc_estimates is None:
+                self.pc_estimates = np.zeros((self.ncov - 2, 1))
+                all_Us = 0
+            self.covariates_regression(self.ncov, 0)
+            pass # Run regression for pcs only
+        elif "CHROM" in message:
             chrom = message["CHROM"]
             warm_start = message["VALS"]
             msg = self._run_logistic_regression(chrom, self.ncov, warm_start)
-            self.server.message(msg)
         else: # First iteration
             self.load_chroms()
             for chrom in self.chroms:
                 msg = self._run_logistic_regression(chrom, self.ncov,  None)
-                self.server.message(msg)
+        self.server.message(msg)
+
+    def covariates_regression(self, npcs, warm_start, rho=1.0):
+        covariates = self.covariates[:,:2]
+        if self.pc_estimates is None:
+            all_Us = 0
+
+        estimates[:,i] = bfgs_more_gutted(covariates, all_Us[:,i], warm_start[:,i],
+            rho, z_hat[:, i], ncov)
+        z_hat = alpha * estimates + (1-alpha) * warm_start
+        return encode({"TASK": Commands.ASSO, "SUBTASK": chrom, 
+          "CHROM": chrom, "VALS": z_hat})
+
+
+            
 
     def _run_logistic_regression(self, chrom, ncov, 
-            warm_start=None, rho=10, alpha=1.0):
+            warm_start=None, rho=1 , alpha=1.0):
         covariates = self.covariates
         with h5py.File(self.store_path, 'r') as store:
             n = store.attrs["n"]
@@ -508,7 +534,7 @@ class ServerTalker(object):
 #            estimates = estimates[0,:].reshape(-1,1)
 #            if not store.attrs['has_normalization']:
 #                self.standardize_data(scale=True, center=True)
-            std = np.sqrt(group["VAR"])
+            af = group["MAF"]
             #offset = 1
             if chrom in self.previous_estimates:
                 z_hat = self.previous_estimates[chrom]
@@ -516,7 +542,7 @@ class ServerTalker(object):
             else:
                 all_Us     = 0
             for i, position in enumerate(positions):
-                if std[i] == 0:
+                if af[i] < self.threshold or (1-af[i]) < self.threshold:
                     estimates[:, i] = np.nan
                 #    offset += 1
                     continue

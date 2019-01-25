@@ -128,10 +128,10 @@ def process_plink_row(row, geno):
 
 
 cdef extern from "plink2_stats.cpp":
-  cpdef double HweP(int32_t obs_hets, int32_t obs_hom1, int32_t ob_hom2, uint32_t midp)
+  cpdef double HweP(int32_t obs_hets, int32_t obs_hom1, int32_t ob_hom2, uint32_t midp, uint32_t lower)
   #cpdef double HweP(ndarray[int32_t, ndim=1] obs_hets, ndarray[int32_t, ndim=1] obs_hom1,
   #    ndarray[int32_t, ndim=1] ob_hom2, uint32_t midp):
-def  hweP(ndarray[int32_t, ndim=2] obs, uint32_t midp):
+def  hweP(ndarray[int32_t, ndim=2] obs, uint32_t midp, uint32_t lower):
     cdef: 
         int32_t het, hom1, hom2, i, k
         ndarray[float64_t, ndim=1] results
@@ -140,7 +140,7 @@ def  hweP(ndarray[int32_t, ndim=2] obs, uint32_t midp):
     results = np.empty((k), dtype=np.float64)
     i = 0
     for hom1, het, hom2 in obs:
-      results[i] = HweP(het, hom1, hom2, midp)
+      results[i] = HweP(het, hom1, hom2, midp, lower)
       i += 1
 
     return results

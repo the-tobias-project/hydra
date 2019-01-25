@@ -6,6 +6,7 @@ import sys
 import os
 import time
 import _pickle as pickle
+import logging
 
 # Third party lib
 import tqdm
@@ -44,9 +45,10 @@ class ServerTalker(object):
         self.max_iters   = 5
         self.finished    = set()
         self.iters       = {}
+        self.logger      = logging.getLogger(__name__)
 
     def report_status(self):
-        print("Now working on: {}".format(self.status))
+        self.logger.info("Now working on: {}".format(self.status))
 
     def dispatch(self,message):
         task = message["TASK"]
@@ -54,7 +56,7 @@ class ServerTalker(object):
         subtask = message["SUBTASK"]
         self.subtask = subtask
         current_task = "{} {}".format(task, subtask)
-        print(current_task)
+        self.logger.debug(current_task)
         if self.status != current_task:
             self.status = current_task
             self.report_status()
@@ -63,7 +65,7 @@ class ServerTalker(object):
                 self.store_positions(message)
             elif subtask == "COUNT":
                 self.store_counts(message)
-                print("Count statistics have been initialized!")
+                self.logger.info("Count statistics have been initialized!")
         elif self.task == Commands.QC:
             self.QC_filters(message["SUBTASK"], message["VALS"])
         elif self.task == Commands.PCA:
@@ -84,7 +86,7 @@ class ServerTalker(object):
                     self.report_content("PCA_passed", msg)
                     self.counter = None
             if self.subtask == "COV":
-                print("building covariance")
+                self.logger.info("building covariance")
                 if self.buildCov(message):
                     self.pca()
                     self.server.get_options()
@@ -96,7 +98,7 @@ class ServerTalker(object):
         positions = message["POS"]
         dsetname = "{}/positions".format(chrom)
         write_or_replace(self.store, dsetname, positions, np.uint32)
-        print("{} loci in chromosome {}.".format(len(positions), chrom))
+        self.logger.info("{} loci in chromosome {}.".format(len(positions), chrom))
 
     def store_counts(self, message):
         n = message["n"]
@@ -143,7 +145,7 @@ class ServerTalker(object):
             var /= (N-counts_dset[:,3]) # 2*af*(1-af)
             var = 2*af*(1-af)
             self.store.create_dataset("{}/var".format(chrom), data=var)
-            hwe = hweP(counts_dset[:,:3].astype(np.int32), 1)
+            hwe = hweP(counts_dset[:,:3].astype(np.int32), 1, 0)
             # Need to Recompile HWEP with uint32
             msg = {"TASK": task, "SUBTASK": "STATS", "CHROM": chrom
                 , "HWE": hwe, "MISS": missing_rate, "AF": af, "VAR": var}
@@ -174,7 +176,7 @@ class ServerTalker(object):
             if QCFilterNames.QC_MPS in filter_list:
                 ind = filter_list.index(QCFilterNames.QC_MPS)
                 tokeep = np.logical_and(tokeep, mr.value < value_list[ind])
-            print("in chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
+            self.logger.info("in chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
                 tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
             # Delete or tag the filtered locations
             if prefix is None: 
@@ -338,7 +340,7 @@ class ServerTalker(object):
         if "E" in msg:
             self.counter -= 1
         if self.counter == 0:
-            print("All covariances have been reported")
+            self.logger.info("All covariances have been reported")
             return True
         return False
 
@@ -349,7 +351,7 @@ class ServerTalker(object):
         meta = self.store["meta"]
         for chrom in chroms: 
             cov_size += meta["{}_{}".format(chrom, chrom)].shape[0]
-        print("Starting covariance matrix of size {} x {}".format(
+        self.logger.info("Starting covariance matrix of size {} x {}".format(
             cov_size, cov_size))
         cov = np.empty((cov_size, cov_size))
         i_old = 0
@@ -398,10 +400,10 @@ class ServerTalker(object):
                     self.finished.add(chrom)
                     chroms = [key for key in self.store if key != 'meta']
                     if len(self.finished) == len(chroms):
-                        print("We are all done with the regression")
+                        self.logger.info("We are all done with the regression")
                         self.server.get_response(Commands.all_commands)
                 self.estimates[chrom] = [beta, self.connections - 1]
-                print(chrom, self.iters[chrom])
+                self.logger.info("Finished iteration{1} on chrom {}".format(self.iters[chrom], chrom))
                 self.server.message(encode({"TASK": Commands.ASSO, 
                   "SUBTASK": None, "CHROM": chrom, "VALS": beta}))
             else:

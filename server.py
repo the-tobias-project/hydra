@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 # stdlib
-import pdb, sys
+import pdb, sys, os
 import json
 import _pickle as pickle
+import logging
 
 # Third party lib
 from twisted.internet import reactor, protocol, threads
@@ -17,7 +18,7 @@ from settings import Settings, Commands, Options, QCOptions, PCAOptions, PCAFilt
 
 NUM = 3
 
-HELP_STRING = "HELP MEEEEE"
+HELP_STRING = "HELP MEEEEE" #TODO
 
 
 class Hub(protocol.Protocol):
@@ -28,6 +29,20 @@ class Hub(protocol.Protocol):
         self.dispatcher = ServerTalker(NUM, self,
                                        local_scratch)
         self.cache = None
+        self.setup_logger()
+
+    def setup_logger(self):
+        logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        self.rootLogger = logging.getLogger()
+        fileHandler = logging.FileHandler("{0}/{1}.log".format(os.getcwd(), "HYDRA_server_logger"))
+        fileHandler.setFormatter(logFormatter)
+        self.rootLogger.addHandler(fileHandler)
+
+        consoleHandler = logging.StreamHandler(sys.stdout)
+        consoleHandler.setFormatter(logFormatter)
+        self.rootLogger.addHandler(consoleHandler)
+        self.rootLogger.setLevel(logging.INFO)
+        
 
     def get_response(self, options):
         options = [val.upper() for val in options]
@@ -36,6 +51,8 @@ class Hub(protocol.Protocol):
             val = input(
                 "Looks like everyone is here. Type the stage you want to proceed with? Options: " + 
                 ", ".join(options)+ ": \n")
+
+            self.rootLogger.info("Asking for input...")
             val = val.upper()
             if val in options:
                 waiting_for_command = False
@@ -49,10 +66,11 @@ class Hub(protocol.Protocol):
             self.run_QC()
         elif val == Commands.PCA:
             self.run_pca()
-            print(val)
         elif val == Commands.ASSO:
             self.run_logistic_regression()
+        self.rootLogger.info(val)
         self.wait_for_and_process_next_message()
+
 
     def run_QC(self):
         task = "QC"
@@ -78,13 +96,13 @@ class Hub(protocol.Protocol):
                     print("Wrong keywords")
                     continue
                 break
+        self.rootLogger.info("QC input: ", vals)
         vals = [float(v) for v in vals]
         outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS": subtasks, "VALS": vals})
         self.message(outMessage)
         inMessage = {"TASK": "QC", "SUBTASK": subtasks, "VALS": vals}
         message_queue.put(inMessage)
         self.get_options()
-        # reactor.callLater(2, self.run_pca())
 
     def run_logistic_regression(self):
         while True:
@@ -98,8 +116,9 @@ class Hub(protocol.Protocol):
                     break
             except NameError:
                 continue
-
-        out_message = pickle.dumps({"TASK": Commands.ASSO, "SUBTASK": "INIT", "VARS": vals})
+        self.rootLogger.info("Regression input: ", vals)
+        out_message = pickle.dumps({"TASK": Commands.ASSO, "SUBTASK": "INIT", "VARS": vals, 
+          "Threshold":2*(vals[0] + 2.0)/self.dispatcher.store.attrs["N"]})
         self.message(out_message)
 
     def get_options(self):
@@ -126,6 +145,7 @@ class Hub(protocol.Protocol):
                 assert len(set(subtasks)) == len(subtasks)
                 assert set(subtasks).issubset(PCAOptions.all_options)
                 break
+        self.rootLogger.info("PCA input: ", vals)
         vals = [float(v) for v in vals]
         outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS": subtasks, "VALS": vals})
         self.message(outMessage)

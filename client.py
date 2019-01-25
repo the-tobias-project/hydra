@@ -2,7 +2,8 @@
 
 # stdlib
 import time
-import sys
+import sys, os
+import logging
 import pdb
 
 # Third party lib
@@ -20,11 +21,23 @@ HOST = 'localhost'
 class MyClient(protocol.Protocol):
     def __init__(self):
         self.cache = None
+        self.setup_logger()
+
+    def setup_logger(self):
+        logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        self.logger = logging.getLogger()
+        fileHandler = logging.FileHandler("{0}/{1}.log".format(os.getcwd(), "HYDRA_client_logger"))
+        fileHandler.setFormatter(logFormatter)
+        self.logger.addHandler(fileHandler)
+        consoleHandler = logging.StreamHandler(sys.stdout) 
+        consoleHandler.setFormatter(logFormatter)
+        self.logger.addHandler(consoleHandler)
+        self.logger.setLevel(logging.INFO)
 
     def connectionMade(self):
-        print("connected!")
+        self.logger.info("Connection made!")
         self.factory.clients.append(self)
-        print("clients are ", self.factory.clients)
+        self.logger.info("Clients are {}".format(self.factory.clients))
         self.cdispatcher = clientSideAnalysis.ServerTalker(plink, 
             local_scratch, self)
         self.wait_for_and_process_next_message()
