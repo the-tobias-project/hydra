@@ -1,12 +1,12 @@
 #!/usr/bin/env python 3
 
 # stdlib
-import pdb
 import sys
 import os
 import time
 import _pickle as pickle
 import logging
+import pdb
 
 # Third party lib
 import tqdm
@@ -124,7 +124,7 @@ class ServerTalker(object):
                 self.status = "INIT STATS"
                 self.report_status()
                 self.count_stats()
-                self.server.run_QC()
+                self.server.get_options()
 
 
     def count_stats(self):
@@ -136,23 +136,25 @@ class ServerTalker(object):
             missing_rate_dset = self.store.create_dataset(
                 "{}/missing_rates".format(chrom), data=missing_rate)
             af = (counts_dset[:,2] * 2 + counts_dset[:,1]).astype(float)
-            af /= (np.sum(counts_dset[:,:3], axis=1)*2)
+            af /= (np.sum(counts_dset[:,:3], axis=1)*2).astype(float)
             #af = np.minimum(af, 1-af)
             self.store.create_dataset("{}/allele_freq".format(chrom), data=af)
-            var = counts_dset[:,0] * (2*af)**2 
-            var += counts_dset[:,1] * (1-2*af)**2 
-            var += counts_dset[:,2] * (2-2*af)**2
-            var /= (N-counts_dset[:,3]) # 2*af*(1-af)
+            #var = counts_dset[:,0] * (2*af)**2 
+            #var += counts_dset[:,1] * (1-2*af)**2 
+            #var += counts_dset[:,2] * (2-2*af)**2
+            #var /= (N-counts_dset[:,3]) # 2*af*(1-af)
             var = 2*af*(1-af)
             self.store.create_dataset("{}/var".format(chrom), data=var)
             hwe = hweP(counts_dset[:,:3].astype(np.int32), 1, 0)
             # Need to Recompile HWEP with uint32
+            time.sleep(1)
             msg = {"TASK": task, "SUBTASK": "STATS", "CHROM": chrom
                 , "HWE": hwe, "MISS": missing_rate, "AF": af, "VAR": var}
-            time.sleep(.1)
+            #pdb.set_trace()
             self.server.message(encode(msg))
             hwe_dset = self.store.create_dataset("{}/hwe".format(chrom)
                 , data=hwe)
+        time.sleep(1)
 
 ################################### QC #######################################
     def QC_filters(self, filter_list, value_list, prefix=None):
@@ -171,8 +173,8 @@ class ServerTalker(object):
                 tokeep = np.logical_and(tokeep, hwe.value > value_list[ind])
             if QCFilterNames.QC_MAF in filter_list:
                 ind = filter_list.index(QCFilterNames.QC_MAF)
-                tokeep = np.logical_and(tokeep, af.value > value_list[ind])
-                tokeep = np.logical_and(tokeep, 1.0-af.value > value_list[ind])
+                tokeep = np.logical_and(tokeep, af.value > value_list[ind] - Settings.kSmallEpsilon)
+                tokeep = np.logical_and(tokeep, 1.0-af.value > value_list[ind] - Settings.kSmallEpsilon)
             if QCFilterNames.QC_MPS in filter_list:
                 ind = filter_list.index(QCFilterNames.QC_MPS)
                 tokeep = np.logical_and(tokeep, mr.value < value_list[ind])
@@ -263,12 +265,12 @@ class ServerTalker(object):
                     self.cross[key])
                 group  = self.store[key]
                 tokeep = self.store["{}/PCA_passed".format(key)].value
-                positions = self.store["{}/PCA_positions".format(key)].value
-                end = min(self.r1 + self.r0, len(positions))
+                #positions = self.store["{}/PCA_positions".format(key)].value
+                end = min(self.r1 + self.r0, len(tokeep))
                 maf = self.store["{}/PCA_allele_freq".format(key)].value[
                     self.r0:end]
                 maf = maf[tokeep[self.r0:end]]
-                maf = np.minimum(maf, 1-maf)
+                maf = 1-np.minimum(maf, 1-maf)
                 n = maf.shape[0]
                 unfiltered = np.ones((n, ), dtype=bool)
                 while True:
@@ -282,8 +284,8 @@ class ServerTalker(object):
                                 if not snp2: # if it didn't pass the filters
                                     continue
                                 elif corr_tot[i,j] ** 2 > thresh:
-                                    if maf[j] > (maf[i] * (1.0 + 
-                                        Settings.kLargeEpsilon)):
+                                    if maf[i] > (maf[j] * (1.0 + 
+                                        Settings.kSmallEpsilon)):
                                         unfiltered[i] = False
                                     else:
                                         unfiltered[j] = False

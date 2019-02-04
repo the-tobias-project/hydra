@@ -4,7 +4,6 @@
 import time
 import sys, os
 import logging
-import pdb
 
 # Third party lib
 from twisted.internet import reactor, protocol, threads
@@ -26,7 +25,7 @@ class MyClient(protocol.Protocol):
     def setup_logger(self):
         logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
         self.logger = logging.getLogger()
-        fileHandler = logging.FileHandler("{0}/{1}.log".format(os.getcwd(), "HYDRA_client_logger"))
+        fileHandler = logging.FileHandler("{0}/{1}.log".format(os.getcwd(), "HYDRA_{}_logger".format(self)))
         fileHandler.setFormatter(logFormatter)
         self.logger.addHandler(fileHandler)
         consoleHandler = logging.StreamHandler(sys.stdout) 

@@ -42,6 +42,8 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
     locus_list = plink_file.get_loci()
     n = len(sample_list)
     p = len(locus_list)
+    fids = np.array([item.fid for item in sample_list])
+    iids = np.array([item.iid for item in sample_list])
     edge_offset = 100
     causal_mut_index = np.linspace(
         edge_offset, p-edge_offset, multigenecity, dtype=int)
@@ -70,19 +72,22 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
     ncases = int(n * p_cases)
     cases_i = sorted_i[:ncases]
     affection = np.zeros(n, dtype=np.int8)
-    affection[cases_i] = 1
-    np.savetxt(out, affection, delimiter='\n', fmt='%1.0i')
+    affection[cases_i] = 2
+    affection[affection == 0] = 1
+    towrite = np.column_stack((fids, iids, affection))
+    np.savetxt(out, towrite, delimiter='\t', fmt=['%s', '%s', '%s'], header='FID\tID\tpheno',)
 
 
 def snps_match(plinkName, store_name, position_dset=None):
     # WARNING: this only works if positions are unique.
-    plink_file = plinkfile.open(plinkName)
     with h5py.File(store_name, 'r', libver='latest') as store:
+        # check the plink file
+        plink_file = plinkfile.open(plinkName)
         locus_list = plink_file.get_loci()
         plink_file.close()
         plinkSet = set((l.chromosome, l.bp_position) for l in locus_list)
-        len_plink = len(plinkSet)
         del locus_list
+        len_plink = len(plinkSet)
         if position_dset is None:
             position_dset = 'positions'
         for key in store:
@@ -120,6 +125,26 @@ def compare_pca(plinkPCA, store_name, dsets_list):
     return valsMatch * sigmasMatch
 
 
+def compare_regression(plinkRegression, store_name, dset_name="results"):
+    converter = lambda x: np.nan if x == b'NA' else float(x)
+    plinkResults = np.loadtxt(plinkRegression, usecols=[0, 6,7,8], skiprows=1, 
+        converters={6: converter, 7: converter, 8: converter})
+    with h5py.File(store_name, 'r') as store:
+        pdb.set_trace()
+        for key in store:
+            if key != "meta":
+                results = store[key+"/{}".format(dset_name)].value
+                res = np.array([i for subset in results for i in subset])
+                plinkSubset_ind = plinkResults[:,0] == int(key)
+                plinkSubset = plinkResults[plinkSubset_ind, :]
+                del plinkSubset_ind
+                
+          
+
+    pass
+    
+
+
 if __name__ == '__main__':
     np.random.seed(123)
-    add_pheno('testData/subsampled', 10, 'testData/wsubsampled.pheno')
+    add_pheno('testData/subsampled', 10, 'testData/subsampled.pheno')

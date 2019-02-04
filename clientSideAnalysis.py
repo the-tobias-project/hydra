@@ -6,7 +6,6 @@ import sys
 import _pickle as pickle
 import os
 import logging
-import pdb
 
 # Third party lib
 import h5py
@@ -52,9 +51,10 @@ class ServerTalker(object):
 
     def _store_path(self):
         plinkName = self.store_name
-        basename = os.path.basename(plinkName)
+        dirname, basename = os.path.split(plinkName)
+        prefix = os.path.basename(dirname)
         write_to = self.scratch
-        store_name = os.path.join(write_to, basename + '.h5py')
+        store_name = os.path.join(write_to, prefix + basename + '.h5py')
         return store_name
 
     def plinkToH5(self):
@@ -98,7 +98,7 @@ class ServerTalker(object):
             current_group = store.require_group(str(current_chr))
             genotypes = np.zeros(n_tot, dtype=np.float32)
             for locus, row in zip(locus_list, plink_file):
-                if locus.chromosome != current_chr: 
+                if locus.chromosome != current_chr:
                     if len(positions) == 0:
                         del store[str(current_chr)]
                     else:
@@ -119,6 +119,7 @@ class ServerTalker(object):
                     current_group = store.require_group(str(current_chr))
                 pos = str(locus.bp_position)
                 counts, geno = process_plink_row(row, genotypes)
+                # THis should be a try except
                 dset = current_group.create_dataset(pos, data=geno)
                 rsids.append(locus.name.encode('utf8'))
                 positions.append(pos)
@@ -224,13 +225,14 @@ class ServerTalker(object):
                 dset = chrom_group.create_dataset(task, data=vals)
 
     def reportCounts(self):
-        time.sleep(.1)
         """Report the counts (Het, homo Alt, missing)"""
+        time.sleep(.5)
         with h5py.File(self.store_path, 'r') as store:
             countDict = {}
             n = store.attrs["n"]
             countDict["START"] = True
             keys = [i for i in store.keys() if i != 'meta']
+            print(self.store_path)
             for chrom in keys:
                 countDict["n"] = int(n)
                 countDict["TASK"] = Commands.INIT
@@ -241,8 +243,7 @@ class ServerTalker(object):
                 if chrom == keys[-1]:
                     countDict["END"] = True
                 self.server.message(encode(countDict))
-                countDict = {}
-                time.sleep(.1)
+                time.sleep(.5)
 
 #################################### QC #######################################
     def run_QC(self, message, remove=True):
@@ -254,8 +255,8 @@ class ServerTalker(object):
                     tokeep = np.logical_and(tokeep, vals > value_list[ind])
                 else:
                     tokeep = np.logical_and(tokeep,
-                        np.logical_and(vals > value_list[ind], 
-                            (1.0-vals) > value_list[ind]))
+                        np.logical_and(vals > value_list[ind] - Settings.kSmallEpsilon, 
+                            (1.0-vals) > value_list[ind] - Settings.kSmallEpsilon))
             return tokeep
 
         def replace_dataset(tokeep, dset_name, return_deleted=False):
@@ -336,42 +337,81 @@ class ServerTalker(object):
             self.tqdm = tqdm.tqdm(total=n)
             self.verbose = False
             self.run_ld({})
- 
+
     def run_ld(self, message):
         msg = {"TASK": "PCA", "SUBTASK": "LD"}
         with h5py.File(self.store_path, 'r') as store:
             n = store.attrs['n']
-            for chrom in self.chroms:
+            if self.r3 == 0: # fake start the first round
+                for chrom in self.chroms: 
+                    # if the length is less than r1, you deserve an error. 
+                    # No apologies 
+                    tags = store["{}/PCA_passed".format(chrom)]
+                    message[chrom] = tags[0:self.r1]
+            for key, state in message.items():
+                if key == "TASK" or key == "SUBTASK":
+                    continue
+                chrom = key
                 tags = store["{}/PCA_passed".format(chrom)]
-                if chrom in message:
-                    state = message[chrom]
-                    if state[0] == "E": # Finished with this chrom
-                        self.chroms.remove(chrom)
-                        if len(self.chroms) == 0:
-                            self.do_ld = False 
-                            self.chroms = None
-                            msg = {"TASK": "PCA", "SUBTASK": "PCA_POS"}
-                            self.server.message(encode(msg))
-                            self.verbose = True
-                            return
-                        continue
-                    else:
-                        tokeep = state
-                        end = self.r3 + len(tokeep)
+                if state[0] == "E": # Finished with this chrom
+                    if len(message) == 3: # Done with everything
+                        self.do_ld = False
+                        self.chroms = None
+                        msg = {"TASK": "PCA", "SUBTASK": "PCA_POS"}
+                        self.server.message(encode(msg))
+                        self.verbose = True
+                        return
+                    continue
                 else:
-                    end = min(self.r3 + self.r1, tags.shape[0])
-                    tokeep = tags[self.r3: end]
+                    tokeep = state
+                    end = self.r3 + len(tokeep)
                 pos = store["{}/PCA_positions".format(chrom)]
                 positions = pos[self.r3: end]
-                positions = positions[tokeep] 
+                positions = positions[tokeep]
                 genotypes = np.empty((n,len(positions)), dtype=np.float32)
-                for i, snp in enumerate(positions): 
+                for i, snp in enumerate(positions):
                     genotypes[:,i] = store["{}/{}".format(chrom, snp)].value
                 corr = nancorr(genotypes)
                 msg[chrom] = corr
         self.server.message(encode(msg))
         self.r3 += self.r2
         self.tqdm.update(self.r2)
+ 
+#    def run_ld(self, message):
+#        msg = {"TASK": "PCA", "SUBTASK": "LD"}
+#        with h5py.File(self.store_path, 'r') as store:
+#            n = store.attrs['n']
+#            for chrom in self.chroms:
+#                tags = store["{}/PCA_passed".format(chrom)]
+#                if chrom in message:
+#                    state = message[chrom]
+#                    if state[0] == "E": # Finished with this chrom
+#                        self.chroms.remove(chrom)
+#                        if len(self.chroms) == 0:
+#                            self.do_ld = False 
+#                            self.chroms = None
+#                            msg = {"TASK": "PCA", "SUBTASK": "PCA_POS"}
+#                            self.server.message(encode(msg))
+#                            self.verbose = True
+#                            return
+#                        continue
+#                    else:
+#                        tokeep = state
+#                        end = self.r3 + len(tokeep)
+#                else:
+#                    end = min(self.r3 + self.r1, tags.shape[0])
+#                    tokeep = tags[self.r3: end]
+#                pos = store["{}/PCA_positions".format(chrom)]
+#                positions = pos[self.r3: end]
+#                positions = positions[tokeep] 
+#                genotypes = np.empty((n,len(positions)), dtype=np.float32)
+#                for i, snp in enumerate(positions): 
+#                    genotypes[:,i] = store["{}/{}".format(chrom, snp)].value
+#                corr = nancorr(genotypes)
+#                msg[chrom] = corr
+#        self.server.message(encode(msg))
+#        self.r3 += self.r2
+#        self.tqdm.update(self.r2)
     
     def update_passed(self, chrom):
         with h5py.File(self.store_path, 'a') as store:

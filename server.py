@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # stdlib
-import pdb, sys, os
+import sys, os
 import json
 import _pickle as pickle
 import logging
@@ -16,7 +16,7 @@ from settings import Settings, Commands, Options, QCOptions, PCAOptions, PCAFilt
 
 # TODO: graceful exit
 
-NUM = 3
+NUM = 8
 
 HELP_STRING = "HELP MEEEEE" #TODO
 
@@ -42,7 +42,6 @@ class Hub(protocol.Protocol):
         consoleHandler.setFormatter(logFormatter)
         self.rootLogger.addHandler(consoleHandler)
         self.rootLogger.setLevel(logging.INFO)
-        
 
     def get_response(self, options):
         options = [val.upper() for val in options]
@@ -96,7 +95,7 @@ class Hub(protocol.Protocol):
                     print("Wrong keywords")
                     continue
                 break
-        self.rootLogger.info("QC input: ", vals)
+        self.rootLogger.info("QC input: {}".format(vals))
         vals = [float(v) for v in vals]
         outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS": subtasks, "VALS": vals})
         self.message(outMessage)
