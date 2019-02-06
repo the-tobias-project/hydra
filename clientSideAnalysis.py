@@ -160,18 +160,23 @@ class ServerTalker(object):
                 chrom = self.store_message(message, "PCA_passed")
                 self.update_passed(chrom)
                 self.chroms.remove(chrom)
+            elif subtask == "fake":
                 if not self.chroms:
                     self.chroms = None
                     self.load_chroms()
                     #self.standardize_data(scale=True, center=True)
-                    self.report_covariance(self.chroms , "PCA_passed")
+                    self.setup_cov_report(self.chroms)
                     self.r0, self.r1 = None, None
-            if subtask == "PCS":
-                self.compute_Us(message)
-        elif task == Commands.ASSO:
-            if self.covariates is None:
-                self.load_covariates(message)
-            self.run_logistic_regression(message)
+            elif subtask == "REPORT":
+                msg = self.report_covariance(message)  
+                self.server.message(msg)
+                time.sleep(1)
+#            if subtask == "PCS":
+#                self.compute_Us(message)
+#        elif task == Commands.ASSO:
+#            if self.covariates is None:
+#                self.load_covariates(message)
+#            self.run_logistic_regression(message)
 
     def standardize_data(self, scale=False, center=True):
         def safe_div(g, sd):
@@ -434,7 +439,22 @@ class ServerTalker(object):
                   dset[:] = val
               return key
 
-    def report_covariance(self, chroms, mask_name):
+    def setup_cov_report(self, chroms):
+        chroms = sorted(chroms)[:2]
+        msg = {"TASK": Commands.PCA, "SUBTASK": "REPORT"}
+        for i_ch1, ch1 in enumerate(chroms):
+            for i_ch2, ch2 in enumerate(chroms):
+                if i_ch2 > i_ch1:
+                    break
+                else:
+                    msg["ch1"] = ch1
+                    msg["ch2"] = ch2
+                    if ch1 == chroms[-1] and ch2 == chroms[-1]:
+                        msg["E"] = True
+                    print(msg)
+                    self.server.dataReceived(encode(msg))
+
+    def report_covariance(self, message):
         def standardize_mat(mat, af, sd):
             af = 2 * af.reshape(af.shape[0], 1)
             mat -= af
@@ -442,40 +462,85 @@ class ServerTalker(object):
             mat[ind, :] /= sd[ind].reshape(np.sum(ind),1)
             mat[np.isnan(mat)] = 0
             return mat
-
-        self.logger.info("reporting cov")
-        chroms = sorted(chroms)
-        msg = {"TASK": "PCA", "SUBTASK": "COV"}
+        ch1 = message["ch1"]
+        ch2 = message["ch2"]
+        msg = {"TASK": Commands.PCA, "SUBTASK": "COV"}
+        self.logger.info("reporting cov: {}_{}".format(ch1, ch2))
         with h5py.File(self.store_path, 'r') as store:
             n = store.attrs["n"]
-            for i_ch1, ch1 in enumerate(chroms):
-                group = store[ch1]
-                tokeep = group['PCA_mask'].value
-                pos = group["positions"].value[tokeep]
-                af1 = group["MAF"].value[tokeep]
-                sd1 = np.sqrt(group["VAR"].value[tokeep])
-                g1 = np.empty((len(pos), n))
-                for i, snp1 in enumerate(pos):
-                    g1[i, :] = group[str(snp1)].value
-                g1 = standardize_mat(g1, af1, sd1)
-                for i_ch2, ch2 in enumerate(chroms):
-                    if i_ch2 > i_ch1:
-                        break
-                    group = store[ch2]
-                    tokeep = group['PCA_mask'].value
-                    af2 = group["MAF"].value[tokeep]
-                    sd2 = np.sqrt(group["VAR"].value[tokeep])
-                    pos   = group["positions"].value[tokeep]
-                    g2     = np.empty((n, len(pos)))
-                    for i, snp2 in enumerate(pos):
-                        g2[:, i] = group[str(snp2)].value
-                    g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
-                    msg["CH1"] = ch1
-                    msg["CH2"] = ch2
-                    msg["MAT"] = g1.dot(g2).astype(np.float32)
-                    if ch1 == chroms[-1] and ch2 == chroms[-1]:
-                        msg["E"] = True
-                    self.server.message(encode(msg))
+            group = store[ch1]
+            tokeep = group['PCA_mask'].value
+            pos = group["positions"].value[tokeep]
+            af1 = group["MAF"].value[tokeep]
+            sd1 = np.sqrt(group["VAR"].value[tokeep])
+            g1 = np.empty((len(pos), n))
+            for i, snp1 in enumerate(pos):
+                g1[i, :] = group[str(snp1)].value
+            g1 = standardize_mat(g1, af1, sd1)
+            group = store[ch2]
+            tokeep = group['PCA_mask'].value
+            af2 = group["MAF"].value[tokeep]
+            sd2 = np.sqrt(group["VAR"].value[tokeep])
+            pos   = group["positions"].value[tokeep]
+            g2     = np.empty((n, len(pos)))
+            for i, snp2 in enumerate(pos):
+                g2[:, i] = group[str(snp2)].value
+            g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
+            msg["CH1"] = ch1
+            msg["CH2"] = ch2
+            msg["MAT"] = g1.dot(g2).astype(np.float32)
+            if "E" in message:
+                msg["E"] = True
+            print(ch1, ch2)
+            return (encode(msg))
+
+
+
+
+#    def report_covariance(self, chroms, mask_name):
+#        def standardize_mat(mat, af, sd):
+#            af = 2 * af.reshape(af.shape[0], 1)
+#            mat -= af
+#            ind = sd>0
+#            mat[ind, :] /= sd[ind].reshape(np.sum(ind),1)
+#            mat[np.isnan(mat)] = 0
+#            return mat
+#
+#        self.logger.info("reporting cov")
+#        chroms = sorted(chroms)
+#        msg = {"TASK": "PCA", "SUBTASK": "COV"}
+#        with h5py.File(self.store_path, 'r') as store:
+#            n = store.attrs["n"]
+#            for i_ch1, ch1 in enumerate(chroms):
+#                group = store[ch1]
+#                tokeep = group['PCA_mask'].value
+#                pos = group["positions"].value[tokeep]
+#                af1 = group["MAF"].value[tokeep]
+#                sd1 = np.sqrt(group["VAR"].value[tokeep])
+#                g1 = np.empty((len(pos), n))
+#                for i, snp1 in enumerate(pos):
+#                    g1[i, :] = group[str(snp1)].value
+#                g1 = standardize_mat(g1, af1, sd1)
+#                for i_ch2, ch2 in enumerate(chroms):
+#                    if i_ch2 > i_ch1:
+#                        break
+#                    group = store[ch2]
+#                    tokeep = group['PCA_mask'].value
+#                    af2 = group["MAF"].value[tokeep]
+#                    sd2 = np.sqrt(group["VAR"].value[tokeep])
+#                    pos   = group["positions"].value[tokeep]
+#                    g2     = np.empty((n, len(pos)))
+#                    for i, snp2 in enumerate(pos):
+#                        g2[:, i] = group[str(snp2)].value
+#                    g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
+#                    msg["CH1"] = ch1
+#                    msg["CH2"] = ch2
+#                    msg["MAT"] = g1.dot(g2).astype(np.float32)
+#                    if ch1 == chroms[-1] and ch2 == chroms[-1]:
+#                        msg["E"] = True
+#                    self.server.message(encode(msg))
+#                    print(ch1, ch2)
+#                    time.sleep(10)
 
     def compute_Us(self, message):
         inv_sigma = message["ISIG"]
@@ -485,7 +550,7 @@ class ServerTalker(object):
             dset = store["meta"]
             pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
             n = 0
-            for chrom in chroms: 
+            for chrom in chroms:
                 n += np.sum(store["{}/PCA_mask".format(chrom)])
             num_inds = store.attrs["n"]
             arr = np.empty((num_inds, n))

@@ -30,6 +30,7 @@ class Hub(protocol.Protocol):
                                        local_scratch)
         self.cache = None
         self.setup_logger()
+        self.queue = message_queue
 
     def setup_logger(self):
         logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
@@ -146,10 +147,11 @@ class Hub(protocol.Protocol):
                 break
         self.rootLogger.info("PCA input: ", vals)
         vals = [float(v) for v in vals]
-        outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS": subtasks, "VALS": vals})
+#        outMessage = pickle.dumps({"TASK": task, "SUBTASK": "FILTERING", "FILTERS": subtasks, "VALS": vals})
+        outMessage = pickle.dumps({"TASK": task, "SUBTASK": "fake"})
         self.message(outMessage)
-        inMessage = {"TASK": "PCA", "SUBTASK": "FILTERS", "FILTERS": subtasks, "VALS": vals}
-        message_queue.put(inMessage)
+#        inMessage = {"TASK": "PCA", "SUBTASK": "FILTERS", "FILTERS": subtasks, "VALS": vals}
+#        message_queue.put(inMessage)
 
     def connectionMade(self):
         print("connected to user", (self))

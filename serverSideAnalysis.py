@@ -88,10 +88,11 @@ class ServerTalker(object):
             if self.subtask == "COV":
                 self.logger.info("building covariance")
                 if self.buildCov(message):
-                    self.pca()
-                    self.server.get_options()
-        elif self.task == Commands.ASSO:
-            self.run_logistic_regression(message)
+                  return
+      #              self.pca()
+      #              self.server.get_options()
+      #  elif self.task == Commands.ASSO:
+      #      self.run_logistic_regression(message)
 
     def store_positions(self, message):
         chrom = message["CHROM"]
@@ -339,6 +340,7 @@ class ServerTalker(object):
         if cov_name in group:
             data += group[cov_name].value
         write_or_replace(group, cov_name, data)
+        print(cov_name)
         if "E" in msg:
             self.counter -= 1
         if self.counter == 0:
