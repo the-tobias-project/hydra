@@ -1,0 +1,151 @@
+swagger: "2.0"
+info:
+  description: Hydra server
+  version: 0.0.1
+  title: Hydra server
+  license:
+    name: MIT
+basePath: "/api"
+tags:
+  - name: client
+    description: A HYDRA client
+  - name: tasks
+    description: tasks for the server to run and broadcast
+consumes:
+  - application/json
+produces:
+  - application/json
+schemes:
+  - "https"
+  - "http"
+paths:
+  /clients:
+    get:
+      tags:
+        - client
+      summary: Get a listing of all registered clients
+      operationId: server.routes.controllers.clients.lst_clients
+      responses:
+        200:
+          description: A listing of registered clients was returned
+    post:
+      tags:
+        - client
+      summary: Add a client to the registry
+      operationId: server.routes.controllers.clients.add_client
+      parameters:
+        - name: client
+          in: body
+          required: true
+          description: Client information to add
+          schema:
+            $ref: '#/definitions/client'
+      responses:
+        200:
+          description: Successfully added client to registry
+  /clients/{client_name}:
+    delete:
+      tags:
+        - client
+      summary: Given a client name, remove it from the registry
+      operationId: server.routes.controllers.clients.remove_client
+      parameters:
+        - name: client_name
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: Successfully removed client from registry
+  /clients/{client_name}/report:
+    post:
+      tags:
+        - client
+      summary: Clients report back their status here.  Used to let humans know when something is done.
+      operationId: server.routes.controllers.clients.report_status
+      parameters:
+        - name: client_name
+          in: path
+          required: true
+          type: string
+        - name: status
+          in: query
+          required: true
+          description: Client status to report
+          type: string
+      responses:
+        200:
+          description: Successfully recieved status report from client
+  /tasks:
+    get:
+      tags:
+        - tasks
+      summary: Get a list of available tasks
+      operationId: server.routes.controllers.tasks.list_tasks
+      responses:
+        200:
+          description: Successfully retrieved list of available tasks
+  /tasks/{task_name}:
+    post:
+      tags:
+        - tasks
+      summary: Start a given task
+      operationId: server.routes.controllers.tasks.start_task
+      parameters:
+        - name: task_name
+          in: path
+          required: true
+          type: string
+          enum:
+            - INIT
+            - QC
+            - PCA
+            - ASSO
+      responses:
+        200:
+          description: Successfully started task
+  /tasks/{task_name}/{subtask_name}:
+    post:
+      tags:
+        - tasks
+      summary: Start a given subtask
+      operationId: server.routes.controllers.tasks.start_subtask
+      parameters:
+        - name: task_name
+          in: path
+          required: true
+          type: string
+          enum:
+            - INIT
+            - QC
+            - PCA
+            - ASSO
+        - name: subtask_name
+          in: path
+          required: true
+          type: string
+        - name: client_name
+          in: query
+          type: string
+          required: true
+        - name: subtask_params
+          in: query
+          type: string
+          required: false
+          description: key-value pairs of any parameters needed to pass into the given subtask
+      responses:
+        200:
+          description: Successfully started subtask
+definitions:
+  client:
+    type: object
+    properties:
+      name:
+        type: string
+        description: Unique name of the client
+      port:
+        type: number
+        description: Port on which the client listens
+      host:
+        type: string
+        description: Address on which the client listens

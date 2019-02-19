@@ -9,18 +9,123 @@ download a copy using testData/download1kG.sh For the purposes of this demo, the
 
 
 ## Server Setup:
+Out of the box, the server requires no arguments.  Assuming you're in the `src`
+directory:
+```bash
+python3 -m server
+```
 
-python server.py
+## Infrastructure
+We use [redis](redis.io) to back the [celery](http://www.celeryproject.org/) workers - you
+will need to have redis installed and running on the client machine(s).
 
 
 ## Client Setup:
+The client needs a few additional arguments to launch successfully.  Assuming 
+you're in the `src` directory, you can get a help message by running: 
+```bash
+python3 -m client --help
+usage: __main__.py [-h] --name
+                   {zealot,dragoon,high_templar,dark_templar,archon,dark_archon}
+                   --plinkfile PLINKFILE [--port PORT]
+                   [--external_host EXTERNAL_HOST] [--max_len MAX_LEN]
+                   [--listen_host LISTEN_HOST]
 
-python runner.py
+CWS client
 
-(runner.py starts 3 data silos) each data silo can be started using `py3 client.py  data_plink_stem`
+optional arguments:
+  -h, --help            show this help message and exit
+  --name {zealot,dragoon,high_templar,dark_templar,archon,dark_archon}
+                        Name of the client to start.
+  --plinkfile PLINKFILE
+                        The plinkfile to analyze
+  --port PORT           [OPTIONAL] Override the default port
+  --external_host EXTERNAL_HOST
+                        [OPTIONAL] Override the default host used by external
+                        systems to access this client. Defaults to localhost
+  --max_len MAX_LEN     [OPTIONAL] Maximum content length for a given
+                        request.Defaults to 1073741824 b
+  --listen_host LISTEN_HOST
+                        [OPTIONAL] Override the default host on which this
+                        clientshould listen. Defaults to 0.0.0.0
+```
+Although the `name` and `plinkfile` arguments are under the `optional arguments`
+heading, attempting to run the client without these will print an error and throw
+you back into your shell.
+
+Let's say we have chosen to start the `zealot` client, whose plinkfiles are in
+`/vagrant/testData/popres1`, i.e., there exist the following files:
+ 
+ * `/vagrant/testData/popres1.bim`
+ * `/vagrant/testData/popres1.bam`
+ * (...)
+
+Then to start the client, assuming the server is already running, from the `src` 
+directory we run:
+
+```bash
+python3 -m client --name=zealot --plinkfile=/vagrant/testData/popres1
+```
+
+We also need a worker for the client, this can be set up by calling:
+
+```bash
+python3 -m worker
+
+
+ -------------- celery@ubuntu-bionic v4.2.1 (windowlicker)
+---- **** -----
+--- * ***  * -- Linux-4.15.0-45-generic-x86_64-with-Ubuntu-18.04-bionic 2019-02-18 19:37:24
+-- * - **** ---
+- ** ---------- [config]
+- ** ---------- .> app:         cws_queue:0x7f485ebcb518
+- ** ---------- .> transport:   redis://localhost:6379//
+- ** ---------- .> results:     redis://localhost:6379/
+- *** --- * --- .> concurrency: 2 (prefork)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** -----
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+```
+
+If you look at the client and server logs, you'll notice the client registered 
+itself with the server on initialization.  The server uses this registration to
+later send out further tasks to each individual client.  On client SIGTERM or SIGINT,
+(e.g. `control + c`) it will attempt to unregister itself from the server.
 
 ## Performing a GWAS
+Assuming you want `N` clients, once you see that the server has `N` clients registered,
+you can start the initialization step by calling:
 
+```bash
+curl http://localhost:9001/api/tasks/INIT -X POST
+``` 
+
+Where the server location and port number are set inside `src/lib/settings.py :: ServerHTTP`.
+
+As the clients perform their tasks, they may send further tasks to the server - these 
+will show up in the server logs, along with the name of the client that sent the task.
+Additionally, once the task is completed, the client will send a status update to the
+server, which will again show up in the server logs.  
+
+
+### Server-side UI
+If you're the kind of person that prefers a web-interface, first make sure you install
+the UI-bindings for connexion by running:
+
+```bash
+pip3 install connexion[swagger-ui]
+```
+
+Then, assuming the server is on `localhost` on port `9001`, we can access the UI at:
+
+[http://localhost:9001/api/ui/](http://localhost:9001/api/ui/)
+
+From here you can click on `GET` requests to, say, get a list of registered clients,
+or write in task paramters and then click a button to send a `POST` request to the
+server.
+
+### Deprecated?
 When all data silos are connected you are prompted to specify how you'd like to proceed. 
 
 `Looks like everyone is here. Type the stage you want to proceed with? Options: HELP, INIT, QC, PCA, EXIT:`  
