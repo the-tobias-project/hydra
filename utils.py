@@ -14,7 +14,7 @@ from settings import Settings
 
 
 def encode(message):
-    return pickle.dumps(message)
+    return pickle.dumps(message) + Settings.PICKLE_STOP
 
 
 def decode(message):
