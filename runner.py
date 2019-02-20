@@ -3,7 +3,11 @@
 import argparse
 import random
 import shlex
+<<<<<<< HEAD
 from subprocess import Popen
+=======
+import pdb
+>>>>>>> pre-switch to http
 
 # Third party lib
 from src.lib.settings import Settings
@@ -13,6 +17,24 @@ names = ['zealot', 'dragoon', 'scout', 'disruptor', 'probe', 'nexus',
          'pylon', 'carrier', 'arbiter', 'immortal', 'colossus', 'templar', 'archon']
 processes = []
 
+<<<<<<< HEAD
+=======
+if __name__ == "__main__":
+  if len(sys.argv) >= 2:
+    local_scratch = sys.argv[1]
+    if len(sys.argv) == 3:
+        PORT = int(sys.argv[2])
+  else:
+    local_scratch = Settings.local_scratch
+  args = [local_scratch]
+  if len(sys.argv) == 3:
+    args += [PORT] 
+  #main(['testData/dset1', 'testData/dset2', 'testData/dset3'], args)
+  main(['page/splitted/BioME/_ppl', "page/splitted/MEC_CA/_ppl",
+    'page/splitted/MEC_HI/_ppl', 'page/splitted/SOL_B/_ppl'
+    , 'page/splitted/SOL_C/_ppl', 'page/splitted/SOL_M/_ppl', 
+    'page/splitted/SOL_S/_ppl', 'page/splitted/WHI/_ppl'], args)
+>>>>>>> pre-switch to http
 
 def worker(plinkList, args):
     aux = ""

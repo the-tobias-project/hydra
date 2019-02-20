@@ -87,6 +87,7 @@ class ServerTalker(object):
                     self.report_content("PCA_passed", msg)
                     self.counter = None
             if self.subtask == "COV":
+                print("here")
                 self.logger.info("building covariance")
                 if self.buildCov(message):
                   return
@@ -333,6 +334,7 @@ class ServerTalker(object):
             self.counter = self.connections
         ch1 = msg["CH1"] 
         ch2 = msg["CH2"]
+        print("dealing with {}_{}".format(ch1, ch2))
         if "meta" not in self.store:
             self.store.create_group("meta")
         group = self.store["meta"]

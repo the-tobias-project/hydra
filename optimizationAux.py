@@ -63,7 +63,7 @@ def bfgs_gutted(C, u, z, rho, x0):
 
 def bfgs_more_gutted(C, u, z, rho, x, n):
   #max_iter = 15000
-  max_iter = 3000
+  max_iter = 30000
   nbd = zeros(n, int32)
   low_bnd = zeros(n, float64)
   upper_bnd = zeros(n, float64)

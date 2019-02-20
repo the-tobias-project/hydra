@@ -65,7 +65,7 @@ def test_init():
     time.sleep(1)
     server.stdin.write('exit\n')
     server.stdin.close()
-    return snps_match('testData/subsampled', Settings.local_scratch+'/dset1.h5py')
+    return snps_match('testData/subsampled', Settings.local_scratch+'/testDatadset1.h5py')
 
 
 def run_plink(plink_cmd, inPlink, temp_fldr):
@@ -91,11 +91,12 @@ def test_qc_hwe(threshold):
     temp_location, server, client = qc_setup()
     server.stdin.write('hwe {}\n'.format(threshold))
     wait_for_process_to_finish(server)
-    plink_cmd = "--hwe {} midp --make-bed".format(threshold)
+    plink_cmd = "--hwe {} midp keep-fewhet --make-bed".format(threshold)
     run_plink(plink_cmd, 'testData/subsampled', temp_location)
     server.stdin.write('exit\n')
     server.stdin.close()
     plink_to_compare_to = os.path.join(temp_location, 'subsampled')
+    time.sleep(1)
     results = snps_match(plink_to_compare_to, temp_location+'/central.h5py')
     shutil.rmtree(temp_location)
     return results
@@ -109,7 +110,7 @@ def test_qc_maf(threshold):
     run_plink(plink_cmd, 'testData/subsampled', temp_location)
     server.stdin.write('exit\n')
     server.stdin.close()
-    time.sleep(.1)
+    time.sleep(1)
     plink_to_compare_to = os.path.join(temp_location, 'subsampled')
     results = snps_match(plink_to_compare_to, temp_location+'/central.h5py')
     shutil.rmtree(temp_location)
@@ -154,8 +155,9 @@ def test_pca_ld_pruning(win, num_pcs):
     plink_cmd = "--pca {}".format(num_pcs)
     plink_loc = temp_location+'/subsampled'
     run_plink(plink_cmd, temp_location+'/subsampled', temp_location)
-    dsets = [temp_location+'/dset1.h5py', temp_location+'/dset2.h5py', 
-        temp_location+'/dset3.h5py']
+    dsets = [temp_location+'/testDatadset1.h5py', temp_location+'/testDatadset2.h5py', 
+        temp_location+'/testDatadset3.h5py']
+    time.sleep(1)
     pca_results = compare_pca(plink_loc, temp_location+'/central.h5py', dsets)
     return ld_results, pca_results, temp_location
 
@@ -167,15 +169,18 @@ def test_ass(ncov, temp_dir):
     time.sleep(1)
     server.stdin.write('Asso\n')
     time.sleep(.1)
-    server.stdin.write('4\n') # 10 pcs
+    server.stdin.write('{}\n'.format(0)) # 10 pcs
     wait_for_process_to_finish(server)
     server.stdin.write('exit')
     server.stdin.close()
     plinkName = 'testData/subsampled'
-    plink_cmd = "--pheno {} --logistic beta --allow-no-sex --covar {}".format(
-        plinkName+'.pheno', temp_dir+"/subsampled.eigenvec")
+#    plink_cmd = "--pheno {} --logistic beta --allow-no-sex --covar {}".format(
+#        plinkName+'.pheno', temp_dir+"/subsampled.eigenvec")
+    pdb.set_trace()
+    plink_cmd = "--pheno {} --logistic beta --allow-no-sex".format(
+        plinkName+'.pheno')
     run_plink(plink_cmd, 'testData/subsampled', temp_dir)
-    time.sleep(15)
+    time.sleep(10)
     compare_regression(temp_dir+"/subsampled.assoc.logistic", temp_dir+'/central.h5py')
 
 
@@ -184,16 +189,16 @@ def run_tests():
     #print(colored("Initialization test: ",'red'), colored(u'\u2713', 'red'))
     #assert test_qc_hwe(1e-5), "HWE failed"
     #print(colored("QC HWE test: ",'red'), colored(u'\u2713', 'red'))
-    #assert test_qc_maf(0.05), "MAF failed"
+    #assert test_qc_maf(0.1), "MAF failed"
     #print(colored("QC maf test: ",'red'), colored(u'\u2713', 'red'))
     #assert test_qc_mps(0.05), "Missing per snp failed"
     #print(colored("QC missing per snp test: ",'red'), colored(u'\u2713', 'red'))
     ld_results, pca_results, pca_temp_location = test_pca_ld_pruning(50, 4)
     assert ld_results, "LD pruning failed"
     print(colored("LD pruning test: ",'red'), colored(u'\u2713', 'red'))
-    assert pca_results, "LD pruning failed"
-    print(colored("PCA pruning test: ",'red'), colored(u'\u2713', 'red'))
-    test_ass(4, pca_temp_location)
+    #assert pca_results, "PCA failed"
+    #print(colored("PCA pruning test: ",'red'), colored(u'\u2713', 'red'))
+    #test_ass(4, pca_temp_location)
 
 
 def main():
