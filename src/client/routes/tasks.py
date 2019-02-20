@@ -21,7 +21,7 @@ def init():
     celery_client.send_task('tasks.init_store',
                             [app.config['client']],
                             serializer='pickle',
-                            headers={'client_name': client_name})
+                            queue=client_name)
     return HTTPResponse.create_response(200)
 
 
@@ -32,15 +32,17 @@ def init_stats():
     celery_client.send_task('tasks.init_stats',
                             [request.data, app.config['client']],
                             serializer='pickle',
-                            headers={'client_name': client_name})
+                            queue=client_name)
     return HTTPResponse.create_response(200)
 
 
 @bp.route('/delayed', methods=['GET'])
 def delayed():
     logging.info('called delayed celery entry point')
+    client_name = app.config['client']['name']
     promise = celery_client.send_task('tasks.caller', [adder_fn, 1, 2],
-                                      serializer='pickle')
+                                      serializer='pickle',
+                                      queue=client_name)
     # resolution = promise.wait()  # answer is in here, if the celery backend is defined.  This will block.
     return HTTPResponse.create_response(200)
 
@@ -48,7 +50,8 @@ def delayed():
 @bp.route('/after_delayed', methods=['GET'])
 def after_delayed():
     logging.info('called after_delayed celery entry point')
-    celery_client.send_task('tasks.dependent', None, serializer='pickle')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.dependent', None, serializer='pickle', queue=client_name)
     return HTTPResponse.create_response(200)
 
 

@@ -16,7 +16,7 @@ python3 -m server
 ```
 
 ## Infrastructure
-We use [redis](redis.io) to back the [celery](http://www.celeryproject.org/) workers - you
+We use [redis](https://redis.io/) to back the [celery](http://www.celeryproject.org/) workers - you
 will need to have redis installed and running on the client machine(s).
 
 
@@ -70,23 +70,30 @@ python3 -m client --name=zealot --plinkfile=/vagrant/testData/popres1
 We also need a worker for the client, this can be set up by calling:
 
 ```bash
-python3 -m worker
+# Format: celery -A worker worker -Q <client_name>
+# -A tells celery to look in the 'worker' directory
+# The second 'worker' argument tells celery to start a worker
+
+celery -A worker worker -Q zealot
 
 
- -------------- celery@ubuntu-bionic v4.2.1 (windowlicker)
+  -------------- celery@ubuntu-bionic v4.2.1 (windowlicker)
 ---- **** -----
---- * ***  * -- Linux-4.15.0-45-generic-x86_64-with-Ubuntu-18.04-bionic 2019-02-18 19:37:24
+--- * ***  * -- Linux-4.15.0-45-generic-x86_64-with-Ubuntu-18.04-bionic 2019-02-20 19:58:42
 -- * - **** ---
 - ** ---------- [config]
-- ** ---------- .> app:         cws_queue:0x7f485ebcb518
+- ** ---------- .> app:         cws_queue:0x7f12b2aa7d68
 - ** ---------- .> transport:   redis://localhost:6379//
 - ** ---------- .> results:     redis://localhost:6379/
 - *** --- * --- .> concurrency: 2 (prefork)
 -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
 --- ***** -----
  -------------- [queues]
-                .> celery           exchange=celery(direct) key=celery
+                .> zealot           exchange=zealot(direct) key=zealot
 ```
+
+You'll notice in Celery's initialization message above that it has registered itself to the
+`zealot` queue.
 
 If you look at the client and server logs, you'll notice the client registered 
 itself with the server on initialization.  The server uses this registration to

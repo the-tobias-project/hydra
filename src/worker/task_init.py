@@ -6,6 +6,7 @@ import sys
 import time
 
 # third party lib
+from celery import current_app
 import h5py
 import numpy as np
 from plinkio import plinkfile
@@ -14,10 +15,8 @@ from plinkio import plinkfile
 # internal lib
 from client.lib import shared
 from lib import HTTPResponse
-from lib.settings import Commands
 from lib.utils import write_or_replace
 from lib.corr import nancorr, process_plink_row
-from worker.__main__ import app
 
 
 def init_store(client_config):
@@ -150,7 +149,7 @@ def send_counts_to_server(data, client_config):
 def init_stats(message, client_config):
     print('Inside init_stats')
     # Wait on previous tasks to finish
-    i = app.control.inspect()
+    i = current_app.control.inspect()
     hostname = socket.gethostname()
     while True:
         active_tasks = i.active()[f'celery@{hostname}']
