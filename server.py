@@ -5,6 +5,7 @@ import sys, os
 import json
 import _pickle as pickle
 import logging
+import pdb
 
 # Third party lib
 from twisted.internet import reactor, protocol, threads
@@ -192,15 +193,22 @@ class Hub(protocol.Protocol):
 
     def dataReceived(self, data):
         if len(self.clients) == NUM:
+            tryDecoding = False
+            if data.endswith(Settings.PICKLE_STOP):
+                data = data[:-13]
+                tryDecoding = True
             if self.cache is not None:
                 data = self.cache + data
-            try:
-                message = decode(data)
-                message_queue.put(message)
-                self.cache = None
-            except Exception as e:
-                self.cache = data
-
+            if tryDecoding:
+                try:
+                    print(sys.getsizeof(data))
+                    pdb.set_trace()
+                    message = decode(data)
+                    print("finished decoding")
+                    message_queue.put(message)
+                    self.cache = None
+                except pickle.UnpicklingError as e:
+                    self.cache = data
 
 class PauseTransport(protocol.Protocol):
     def makeConnection(self, transport):

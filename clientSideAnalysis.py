@@ -440,7 +440,7 @@ class ServerTalker(object):
               return key
 
     def setup_cov_report(self, chroms):
-        chroms = sorted(chroms)[:2]
+        chroms = sorted(chroms)[5:]
         msg = {"TASK": Commands.PCA, "SUBTASK": "REPORT"}
         for i_ch1, ch1 in enumerate(chroms):
             for i_ch2, ch2 in enumerate(chroms):
@@ -451,7 +451,6 @@ class ServerTalker(object):
                     msg["ch2"] = ch2
                     if ch1 == chroms[-1] and ch2 == chroms[-1]:
                         msg["E"] = True
-                    print(msg)
                     self.server.dataReceived(encode(msg))
 
     def report_covariance(self, message):
@@ -491,6 +490,7 @@ class ServerTalker(object):
             msg["MAT"] = g1.dot(g2).astype(np.float32)
             if "E" in message:
                 msg["E"] = True
+            time.sleep(5)
             print(ch1, ch2)
             return (encode(msg))
 

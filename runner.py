@@ -1,6 +1,7 @@
 import sys
 from subprocess import Popen
 import shlex
+import pdb
 
 # Third party lib
 from settings import Settings
@@ -27,5 +28,9 @@ if __name__ == "__main__":
   args = [local_scratch]
   if len(sys.argv) == 3:
     args += [PORT] 
-  main(['testData/dset1', 'testData/dset2', 'testData/dset3'], args)
+  #main(['testData/dset1', 'testData/dset2', 'testData/dset3'], args)
+  main(['page/splitted/BioME/_ppl', "page/splitted/MEC_CA/_ppl",
+    'page/splitted/MEC_HI/_ppl', 'page/splitted/SOL_B/_ppl'
+    , 'page/splitted/SOL_C/_ppl', 'page/splitted/SOL_M/_ppl', 
+    'page/splitted/SOL_S/_ppl', 'page/splitted/WHI/_ppl'], args)
 

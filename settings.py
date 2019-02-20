@@ -9,9 +9,10 @@ class Settings(object):
     kSmallEpsilon = 5.684341886080802e-14
     kLargeEpsilon = 1e-07
     SMALL_EPSILON = 5.684341886080802e-14
+    PICKLE_STOP = "The stop code".encode('ascii')
     local_scratch = "/local/scratch/armin/Hydra"  # This should be stored in a more ephemeral location
     python = "/srv/gsfs0/software/python/3.6.4/bin/python3"
-    plink = "/srv/gsfs0/software/plink/1.90/plink"
+    plink = "/srv/gsfs0/software/plink/2.0/plink2"
 
 
 class Commands(object):
