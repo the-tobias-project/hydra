@@ -91,7 +91,10 @@ def plinkToH5(client_config):
             pos = str(locus.bp_position)
             counts, geno = process_plink_row(row, genotypes)
             # This should be a try except
-            dset = current_group.create_dataset(pos, data=geno)
+            try:
+              dset = current_group.create_dataset(pos, data=geno)
+            except:
+              print(pos)
             rsids.append(locus.name.encode('utf8'))
             positions.append(pos)
             all_counts.append(counts)

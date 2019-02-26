@@ -9,10 +9,10 @@ class Settings(object):
     kSmallEpsilon = 5.684341886080802e-14
     kLargeEpsilon = 1e-07
     SMALL_EPSILON = 5.684341886080802e-14
-    #local_scratch = "/local/scratch/armin/Hydra"  # This should be stored in a more ephemeral location
-    local_scratch = '/vagrant/tmp'
-    #python = "/srv/gsfs0/software/python/3.6.4/bin/python3"
-    python = '/usr/bin/env python3'
+    local_scratch = "/local/scratch/armin/Hydra"  # This should be stored in a more ephemeral location
+    #local_scratch = '/vagrant/tmp'
+    python = "/srv/gsfs0/software/python/3.6.4/bin/python3"
+    #python = '/usr/bin/env python3'
     plink = "/srv/gsfs0/software/plink/1.90/plink"
     redis_uri = 'redis://localhost:6379'
 
@@ -94,45 +94,61 @@ class ClientHTTP(object):
     default_listen_host = '0.0.0.0'
     default_external_host = 'localhost'
     clients = [{
-            'name': 'zealot',
+            'name': 'BioME',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9002,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'dragoon',
+            'name': 'MEC_CA',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9003,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'high_templar',
+            'name': 'MEC_HI',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9004,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'dark_templar',
+            'name': 'SOL_B',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9005,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'archon',
+            'name': 'SOL_C',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9006,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'dark_archon',
+            'name': 'SOL_M',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9007,
             'max_content_length': default_max_content_length
+        },
+        {
+            'name': 'SOL_S',
+            'listen_host': default_listen_host,
+            'external_host': default_external_host,
+            'port': 9008,
+            'max_content_length': default_max_content_length
+        },
+        {
+            'name': 'WHI',
+            'listen_host': default_listen_host,
+            'external_host': default_external_host,
+            'port': 9009,
+            'max_content_length': default_max_content_length
         }
+
+
     ]
