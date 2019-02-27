@@ -70,11 +70,11 @@ python3 -m client --name=zealot --plinkfile=/vagrant/testData/popres1
 We also need a worker for the client, this can be set up by calling:
 
 ```bash
-# Format: celery -A worker worker -Q <client_name>
+# Format: celery -A worker worker -Q <client_name> -n <client_name>
 # -A tells celery to look in the 'worker' directory
 # The second 'worker' argument tells celery to start a worker
 
-celery -A worker worker -Q zealot
+celery -A worker worker -Q zealot -n zealot
 
 
   -------------- celery@ubuntu-bionic v4.2.1 (windowlicker)

@@ -30,7 +30,13 @@ def plinkToH5(client_config):
     """Gets plink prefix, produces an HDF file with the same prefix"""
     pfile = client_config['plinkfile']
     store_name = shared.get_plink_store(pfile)
-    plink_file = plinkfile.open(pfile)
+    print('opening plinkfile')
+    try:
+        plink_file = plinkfile.open(pfile)
+    except MemoryError as e:
+        print('memory error!')
+        print(e)
+    print('opened plinkfile')
     if not plink_file.one_locus_per_row():
         print("""This script requires that snps are
             rows and samples columns.""")
@@ -38,6 +44,7 @@ def plinkToH5(client_config):
     sample_list = plink_file.get_samples()
     locus_list = plink_file.get_loci()
     n_tot = len(sample_list)
+    print('opening h5py file')
     with h5py.File(store_name, 'w', libver='latest') as store:
         store.attrs['n'] = len(sample_list)
         store.attrs['has_local_AF'] = False
@@ -153,9 +160,9 @@ def init_stats(message, client_config):
     print('Inside init_stats')
     # Wait on previous tasks to finish
     i = current_app.control.inspect()
-    hostname = socket.gethostname()
+    client_name = client_config['name']
     while True:
-        active_tasks = i.active()[f'celery@{hostname}']
+        active_tasks = i.active()[f'celery@{client_name}']
         dependent_tasks = list(filter(lambda x: x['name'] == 'tasks.init_store', active_tasks))
         if len(dependent_tasks) > 0:
             print('Waiting on tasks.init_store to finish')
@@ -188,5 +195,5 @@ def init_stats(message, client_config):
     print('Finished with init_stats')
 
     client_name = client_config['name']
-    status = 'Finished with init stats'
+    status = f'Finished with init stats for chrom {chrom}'
     HTTPResponse.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST')
