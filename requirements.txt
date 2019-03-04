@@ -11,3 +11,4 @@ flask==1.0.2
 connexion==2.2.0
 sklearn
 celery==4.2.1
+billiard==3.5.0.4

@@ -10,6 +10,7 @@ from lib.settings import Settings
 
 
 names = ["BioME", "MEC_CA", "MEC_HI", "SOL_B", "SOL_M", "SOL_S", "SOL_C", "WHI"]
+names = ["SOL_B", "SOL_M", "SOL_S"]
 
 
 def worker(plinkList, args):
@@ -21,7 +22,7 @@ def worker(plinkList, args):
         name = names[i]
         arguments = f"--plinkfile {plinkFile} --name {name} "#{aux}"
         shlex_client = shlex.split(Settings.python + " -m client " + arguments)
-        shlex_worker = shlex.split(f"celery -A worker worker -Q {name} -n {name}")
+        shlex_worker = shlex.split(f"celery -A worker worker -Q {name} -n {name} --concurrency 1")
         processes.append(Popen(shlex_client))
         processes.append(Popen(shlex_worker))
     for p in processes:

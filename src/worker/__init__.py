@@ -11,7 +11,7 @@ from celery.utils.log import get_task_logger
 
 # internal lib
 from lib.settings import Settings
-from worker import task_init
+from worker import task_init, task_qc
 
 sys.path.append(os.path.abspath('../lib'))
 sys.path.append(os.path.abspath('../client'))
@@ -77,3 +77,8 @@ def init_store(client_config):
 @app.task(name='tasks.init_stats')
 def init_stats(message, client_config):
     task_init.init_stats(message, client_config)
+
+
+@app.task(name='tasks.init_qc')
+def init_qc(message, client_config):
+    task_qc.init_qc(message, client_config)

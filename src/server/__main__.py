@@ -95,7 +95,8 @@ def main():
     app.app.config['MAX_CONTENT_LENGTH'] = server['max_content_length']
     app.app.config['server'] = server  # Store configuration for later use
 
-    app.run(host=server['listen_host'], port=server['port'])
+    app.run(host=server['listen_host'], port=server['port'], threaded=False)
+    #app.run(host=server['listen_host'], port=server['port'])
 
 
 if __name__ == '__main__':

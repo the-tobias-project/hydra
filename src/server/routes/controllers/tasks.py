@@ -21,8 +21,16 @@ def start_task(task_name):
     logging.info(f'Got command to start {task_name}, starting...')
     if task_name == Commands.INIT:
         task_init.start_init_task()
-    elif task_name == Commands.QC:
-        task_qc.start_qc_task()
+    elif task_name[:2] == Commands.QC:
+        task_name = "QChwe1e-10"
+        filters = task_qc.split_command(task_name)
+        print("Specified Filters :{filters}")
+        task_qc.start_client_qc_task(filters)
+        task_qc.start_local_qc_task(filters)
+    elif task_name == Commands.PCA:
+        pass
+    elif task_name == Commands.ASSO:
+        pass
 
 
 def start_subtask(task_name, subtask_name, client_name):

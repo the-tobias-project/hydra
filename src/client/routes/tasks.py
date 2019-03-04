@@ -55,5 +55,16 @@ def after_delayed():
     return HTTPResponse.create_response(200)
 
 
+@bp.route('/qc', methods=['POST'])
+def qc():
+    logging.info('Got command for QC')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.init_qc',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
 def adder_fn(a, b):
     return a + b

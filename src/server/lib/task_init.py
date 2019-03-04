@@ -92,7 +92,6 @@ def count_stats():
             "AF": af,
             "VAR": var
         }
-        # pdb.set_trace()
         msg = pickle.dumps(msg)
         for client in clients:
             Registry.get_instance().set_client_state(client['name'], Commands.INIT_STATS)
