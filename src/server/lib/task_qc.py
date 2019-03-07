@@ -36,12 +36,17 @@ def split_command(command):
     x = re.search(name+refloat, command)
     if x: # missing per SNP is filter
         filters[name] = float(x.group()[len(name):])
+    name = Options.LD
+    x = re.search(name+"[0-9]*_"+refloat, command)
+    if x:
+        x = x.group()[len(name):]
+        filters[name] = x.split("_")
     return filters
 
 
-def start_client_qc_task(filters):
+def start_client_qc_task(filters, stage=Commands.QC):
     for client in clients:
-        Registry.get_instance().set_client_state(client['name'], Commands.QC)
+        Registry.get_instance().set_client_state(client['name'], stage)
         data = pickle.dumps(filters)
         requests.post(f'http://{client["external_host"]}:{client["port"]}/api/qc', data=data)
 
@@ -72,7 +77,7 @@ def start_local_qc_task(filters, prefix=None): #Filter based on local info
         logging.info("In chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
             tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
         # Delete or tag the filtered locations
-        if prefix is None: 
+        if prefix is None:
             pos_vals, counts_vals = pos.value[tokeep], counts.value[tokeep]
             mr_vals = mr.value[tokeep]
             del group["positions"], group["counts"], group["missing_rates"]
@@ -108,4 +113,11 @@ def start_local_qc_task(filters, prefix=None): #Filter based on local info
             d3 = group.require_dataset(prefix + "allele_freq"
                 , af_vals.shape, dtype=af_vals.dtype)
             d3[:] = af_vals
+    store.close()
 
+def filter_finished(client_name, state):
+    Registry.get_instance().set_client_state(client_name, "Filterd")
+    if Registry.get_instance().num_clients_in_state(state) == 0:
+        logging.info(f"Done with filtering in {Commands.QC} stage")
+        return False
+    return True

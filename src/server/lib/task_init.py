@@ -37,7 +37,6 @@ def store_positions(data):
 
 def store_counts(data, client_name):
     message = pickle.loads(data)
-
     n = message["n"]
     logging.info('storing counts')
     if "START" in message:

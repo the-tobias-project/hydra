@@ -66,5 +66,18 @@ def qc():
     return HTTPResponse.create_response(200)
 
 
+@bp.route('/pca/ld', methods=['POST'])
+def ld_report():
+    logging.info('Got command for LD')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.report_ld',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
+
+
 def adder_fn(a, b):
     return a + b

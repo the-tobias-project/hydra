@@ -17,13 +17,16 @@ from client.lib import shared
 from lib import HTTPResponse
 from lib.utils import write_or_replace
 from lib.corr import nancorr, process_plink_row
-from lib.settings import QCFilterNames
+from lib.settings import QCFilterNames, Settings
 
 
 def init_qc(message, client_config):
     print("Pefroming QC")
     filters = pickle.loads(message)
-    run_QC(filters, client_config, remove=True)
+    remove = True
+    if "remove" in filters:
+        remove = filters["remove"]
+    run_QC(filters, client_config, remove=remove)
     print('Finished reporting counts')
 
 
@@ -89,5 +92,7 @@ def run_QC(filters, client_config, remove=True):
                     positions = group['positions'].value[tokeep]
                     group.create_dataset("PCA_mask", data=tokeep, dtype=bool)
                     group.create_dataset("PCA_positions", data=positions)
+    client_name = client_config['name']
+    HTTPResponse.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name)
 
 
