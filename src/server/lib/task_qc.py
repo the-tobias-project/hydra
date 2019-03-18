@@ -113,11 +113,10 @@ def start_local_qc_task(filters, prefix=None): #Filter based on local info
             d3 = group.require_dataset(prefix + "allele_freq"
                 , af_vals.shape, dtype=af_vals.dtype)
             d3[:] = af_vals
-    store.close()
 
 def filter_finished(client_name, state):
     Registry.get_instance().set_client_state(client_name, "Filterd")
-    if Registry.get_instance().num_clients_in_state(state) == 0:
+    if not Registry.get_instance().num_clients_in_state(state):
         logging.info(f"Done with filtering in {Commands.QC} stage")
-        return False
-    return True
+        return True
+    return False

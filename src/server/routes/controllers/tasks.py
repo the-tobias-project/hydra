@@ -28,12 +28,15 @@ def start_task(task_name):
         task_qc.start_client_qc_task(filters)
         task_qc.start_local_qc_task(filters)
     elif task_name.startswith(Commands.PCA):
-        task_name = "PCAMAF0.1LD50_0.2"
-        eigen_decomposed = task_pca.decomposed()
-        if not eigen_decomposed:
-            filters = task_qc.split_command(task_name)
-            print(f"Specified pruning filters :{filters}")
-            task_pca.start_pca_filters(filters)
+        if not task_pca.decomposed():
+            if not task_pca.filtered():
+                task_name = "PCAMAF0.1LD50_0.2"
+                filters = task_qc.split_command(task_name)
+                print(f"Specified pruning filters :{filters}")
+                task_pca.start_pca_filters(filters)
+            else:
+                for client in Registry.get_instance().list_clients():
+                    start_subtask(Commands.PCA, "PCAPOS", client)
         pass
     elif task_name == Commands.ASSO:
         pass
@@ -50,21 +53,24 @@ def start_subtask(task_name, subtask_name, client_name):
             logging.info(f'Got COUNT response from {client_name}')
             task_init.store_counts(request.data, client_name)
 
-    if task_name.startswith(Commands.QC):
+    elif task_name.startswith(Commands.QC):
         if subtask_name == "FIN":
             if task_qc.filter_finished(client_name, Commands.QC):
                 print("We can move on")
 
-    if task_name.startswith(Commands.PCA):
+    elif task_name.startswith(Commands.PCA):
         if subtask_name == "FIN":
             if task_qc.filter_finished(client_name, Commands.PCA):
                 print("Done with PCA filters")
                 reset_states("PRUNE")
-                global ld_agg
-                ld_agg = task_pca.CovarianceAggregator(len(Registry.get_instance().list_clients()))
-
-        if subtask_name == "LD":
+                ld_agg = task_pca.CovarianceAggregator.get_instance(len(Registry.get_instance().list_clients()), 50)
+        elif subtask_name == "LD":
+            ld_agg = task_pca.CovarianceAggregator.get_instance(len(Registry.get_instance().list_clients()), 50)
             ld_agg.update(request.data)
+        elif subtask_name == "PCAPOS":
+            task_pca.report_pos(client_name)
+            message_clients("pca/cov")
+
 
     return HTTPResponse.create_response(200)
 
@@ -72,7 +78,12 @@ def start_subtask(task_name, subtask_name, client_name):
 def reset_states(state):
     instance = Registry.get_instance()
     for client in instance.list_clients():
-        instance.get_client_state(client["name"], state)
+        instance.set_client_state(client["name"], state)
+
+
+def message_clients(message):
+    for client in clients:
+        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/{message}')
 
 
 

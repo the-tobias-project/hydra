@@ -93,6 +93,9 @@ def run_QC(filters, client_config, remove=True):
                     group.create_dataset("PCA_mask", data=tokeep, dtype=bool)
                     group.create_dataset("PCA_positions", data=positions)
     client_name = client_config['name']
-    HTTPResponse.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name)
+    if remove:
+        HTTPResponse.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name)
+    else:
+        HTTPResponse.respond_to_server('api/tasks/PCA/FIN', "POST", b'', client_name)
 
 

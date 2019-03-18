@@ -77,6 +77,27 @@ def ld_report():
     return HTTPResponse.create_response(200)
 
 
+@bp.route('/pca/pcapos', methods=['POST'])
+def ld_report():
+    logging.info('Got results of filtered positions')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.store_filtered',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
+@bp.route('/pca/cov', methods=['POST'])
+def communicate_cov():
+    logging.info('Preparing to report covariances')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.report_cov',
+                            [None, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
 
 
 def adder_fn(a, b):

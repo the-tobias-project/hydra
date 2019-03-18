@@ -18,98 +18,118 @@ from lib import HTTPResponse
 from lib.utils import write_or_replace
 from lib.corr import nancorr, process_plink_row
 
+class LdReporter(object):
+    __instance = None
 
-def report_ld(data, client_config):
-    pfile = client_config["plinkfile"]
-    with h5py.File(shared.get_plink_store(pfile), 'a') as store:
-        n = store.attrs['n']
+    def __init__(self, win_size, client_config):
+        if LdReporter.__instance is not None:
+            return 
+        else:
+            self.r3 = 0
+            self.r1, self.r2 = win_size, int(win_size/2)
+            LdReporter.__instance = self
+            pfile = client_config["plinkfile"]
+            self.store = h5py.File(shared.get_plink_store(pfile), 'a')
+            self.chroms = [key for key, items in self.store.items() if key != "meta"]
+            LdReporter.__instance = self
+
+    @staticmethod
+    def get_instance(win_size, client_config):
+        if LdReporter.__instance is None:
+            return LdReporter(win_size, client_config)
+        return LdReporter.__instance
+
+    def update(self, data, client_config):
+        data = pickle.loads(data)
+        n = self.store.attrs['n']
+        msg = {}
         if self.r3 == 0: # fake start the first round
             for chrom in self.chroms: 
                 # if the length is less than r1, you deserve an error. 
                 # No apologies 
-                tags = store["{}/PCA_passed".format(chrom)]
-                message[chrom] = tags[0:self.r1]
-        for key, state in message.items():
+                tags = self.store["{}/PCA_passed".format(chrom)]
+                data[chrom] = tags[0:self.r1]
+        for key, state in data.items():
             if key == "TASK" or key == "SUBTASK":
                 continue
             chrom = key
-            tags = store["{}/PCA_passed".format(chrom)]
+            tags = self.store["{}/PCA_passed".format(chrom)]
             if state[0] == "E": # Finished with this chrom
-                if len(message) == 3: # Done with everything
-                    self.do_ld = False
-                    self.chroms = None
-                    msg = {"TASK": "PCA", "SUBTASK": "PCA_POS"}
-                    self.server.message(encode(msg))
-                    self.verbose = True
+                if len(data) == 1: # Done with everything
+                    msg = pickle.dumps({})
+                    HTTPResponse.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
+                        client_config['name'])
+                    print("Done with LD pruning")
                     return
                 continue
             else:
                 tokeep = state
                 end = self.r3 + len(tokeep)
-            pos = store["{}/PCA_positions".format(chrom)]
+            pos = self.store["{}/PCA_positions".format(chrom)]
             positions = pos[self.r3: end]
             positions = positions[tokeep]
             genotypes = np.empty((n,len(positions)), dtype=np.float32)
             for i, snp in enumerate(positions):
-                genotypes[:,i] = store["{}/{}".format(chrom, snp)].value
+                genotypes[:,i] = self.store["{}/{}".format(chrom, snp)].value
             corr = nancorr(genotypes)
             msg[chrom] = corr
-    self.server.message(encode(msg))
-    self.r3 += self.r2        
-
-def init_store(client_config):
-    plinkToH5(client_config)
-    print("preparing counts")
-    report_counts(client_config)
-    print('Finished reporting counts')
+        msg = pickle.dumps(msg)
+        HTTPResponse.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'])
+        self.r3 += self.r2
+        print(self.r3)
 
 
-def send_counts_to_server(data, client_config):
-    print('sending counts to server')
-    client_name = client_config['name']
-    data = pickle.dumps(data)
-    HTTPResponse.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name)
-    print('sent counts to server')
-
-
-def init_stats(message, client_config):
-    print('Inside init_stats')
-    # Wait on previous tasks to finish
-    i = current_app.control.inspect()
-    client_name = client_config['name']
-    while True:
-        active_tasks = i.active()[f'celery@{client_name}']
-        dependent_tasks = list(filter(lambda x: x['name'] == 'tasks.init_store', active_tasks))
-        if len(dependent_tasks) > 0:
-            print('Waiting on tasks.init_store to finish')
-            time.sleep(.1)
-        else:
-            break
-    print('Resuming with init_stats')
-    message = pickle.loads(message)
-    chrom = message["CHROM"]
-    print(f'Chrom: {chrom}')
-    pfile = client_config['plinkfile']
+def store_filtered(message, client_config):
+    pfile = client_config["plinkfile"]
+    msg = pickle.loads(message)
     with h5py.File(shared.get_plink_store(pfile), 'a') as store:
-        chrom_group = store[str(chrom)]
-        if "MISS" in message:
-            vals = message["MISS"]
-            task = "not_missing_per_snp"
-            dset = chrom_group.create_dataset(task, data=1 - vals)
-        if "AF" in message:
-            vals = message["AF"]
-            task = 'MAF'
-            dset = chrom_group.create_dataset(task, data=vals)
-        if "HWE" in message:
-            vals = message["HWE"]
-            task = "hwe"
-            dset = chrom_group.create_dataset(task, data=vals)
-        if "VAR" in message:
-            vals = message["VAR"]
-            task = "VAR"
-            dset = chrom_group.create_dataset(task, data=vals)
-    print('Finished with init_stats')
+        for chrom, val in msg:
+            dset = store.require_dataset(f"{key}/PCA_passed", val.shape, dtype = val.dtype)
+            dset[:] = val
 
-    client_name = client_config['name']
-    status = f'Finished with init stats for chrom {chrom}'
-    HTTPResponse.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST')
+
+def report_cov(client_config):
+    def standardize_mat(mat, af, sd):
+        af = 2 * af.reshape(af.shape[0], 1)
+        mat -= af
+        ind = sd>0
+        mat[ind, :] /= sd[ind].reshape(np.sum(ind),1)
+        mat[np.isnan(mat)] = 0
+        return mat
+    pfile = client_config["plinkfile"]
+    msg = {}
+    with h5py.File(pfile, 'r') as store:
+        n = store.attrs["n"]
+        for ch1 in store:
+            if ch1 == "meta":
+                continue
+            group = store[ch1]
+            tokeep = group['PCA_mask'].value
+            pos = group["positions"].value[tokeep]
+            af1 = group["MAF"].value[tokeep]
+            sd1 = np.sqrt(group["VAR"].value[tokeep])
+            g1 = np.empty((len(pos), n))
+            for i, snp1 in enumerate(pos):
+                g1[i, :] = group[str(snp1)].value
+            g1 = standardize_mat(g1, af1, sd1)
+            for ch2 in store: 
+                if ch2 == "meta":
+                    continue
+                print(f"Reporting cov: {ch1}_{ch2}")
+                group = store[ch2]
+                tokeep = group['PCA_mask'].value
+                af2 = group["MAF"].value[tokeep]
+                sd2 = np.sqrt(group["VAR"].value[tokeep])
+                pos   = group["positions"].value[tokeep]
+                g2     = np.empty((n, len(pos)))
+                for i, snp2 in enumerate(pos):
+                    g2[:, i] = group[str(snp2)].value
+                g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
+                msg["CH1"] = ch1
+                msg["CH2"] = ch2
+                msg["MAT"] = g1.dot(g2).astype(np.float32)
+                if "E" in message:
+                    msg["E"] = True
+                print(ch1, ch2)
+                msg = pickle.dumps(msg)
+                HTTPResponse.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'])
