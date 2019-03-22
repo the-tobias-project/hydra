@@ -78,7 +78,7 @@ def ld_report():
 
 
 @bp.route('/pca/pcapos', methods=['POST'])
-def ld_report():
+def store_filtered():
     logging.info('Got results of filtered positions')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.store_filtered',
@@ -93,11 +93,21 @@ def communicate_cov():
     logging.info('Preparing to report covariances')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.report_cov',
-                            [None, app.config['client']],
+                            [app.config['client']],
                             serializer='pickle',
                             queue=client_name)
     return HTTPResponse.create_response(200)
 
+
+@bp.route('/pca/eig', methods=['POST'])
+def pca_projection():
+    logging.info('Computing projections')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.pca',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
 
 
 def adder_fn(a, b):

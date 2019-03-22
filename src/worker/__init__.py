@@ -100,3 +100,7 @@ def report_cov(client_config):
     task_pca.report_cov(client_config)
 
 
+@app.task(name='tasks.pca')
+def pca_projection(data, client_config):
+    task_pca.pca_projection(data, client_config)
+

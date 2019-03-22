@@ -3,6 +3,7 @@ import logging
 
 # third party lib
 from flask import request
+import requests
 
 # internal lib
 from lib import tasks
@@ -28,18 +29,22 @@ def start_task(task_name):
         task_qc.start_client_qc_task(filters)
         task_qc.start_local_qc_task(filters)
     elif task_name.startswith(Commands.PCA):
-        if not task_pca.decomposed():
+        if not task_pca.ready_to_decompose():
             if not task_pca.filtered():
                 task_name = "PCAMAF0.1LD50_0.2"
                 filters = task_qc.split_command(task_name)
                 print(f"Specified pruning filters :{filters}")
                 task_pca.start_pca_filters(filters)
-            else:
-                for client in Registry.get_instance().list_clients():
-                    start_subtask(Commands.PCA, "PCAPOS", client)
-        pass
+            print("Reporting Filtered Sites")
+            task_pca.report_pos()
+            print("Reporting Filtered Sites")
+            message_clients("pca/cov")
+        else:
+            print("starting eigen decomposition")
+            task_pca.eigenDecompose(n_components=10)
     elif task_name == Commands.ASSO:
-        pass
+        print("Running Associations")
+        task_ass.start_association()
 
 
 def start_subtask(task_name, subtask_name, client_name):
@@ -64,12 +69,16 @@ def start_subtask(task_name, subtask_name, client_name):
                 print("Done with PCA filters")
                 reset_states("PRUNE")
                 ld_agg = task_pca.CovarianceAggregator.get_instance(len(Registry.get_instance().list_clients()), 50)
+                # send message to start LD pruning 
+                ld_agg.send_request({})
         elif subtask_name == "LD":
             ld_agg = task_pca.CovarianceAggregator.get_instance(len(Registry.get_instance().list_clients()), 50)
             ld_agg.update(request.data)
         elif subtask_name == "PCAPOS":
-            task_pca.report_pos(client_name)
+            task_pca.report_pos([client_name])
             message_clients("pca/cov")
+        elif subtask_name == "COV":
+            task_pca.store_covariance(client_name, request.data)
 
 
     return HTTPResponse.create_response(200)
@@ -82,7 +91,7 @@ def reset_states(state):
 
 
 def message_clients(message):
-    for client in clients:
+    for client in Registry.get_instance().list_clients():
         requests.post(f'http://{client["external_host"]}:{client["port"]}/api/{message}')
 
 

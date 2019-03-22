@@ -4,11 +4,13 @@ import pickle
 import re
 import os
 import pdb
+import time
 
 # third party lib
 import requests
 import h5py
 import numpy as np
+from scipy.sparse.linalg import eigsh as eig
 
 # internal lib
 from lib.settings import Settings, Options, PCAFilterNames, Commands
@@ -22,8 +24,17 @@ store = h5py.File(storePath, "a")
 clients = Registry.get_instance().list_clients()
 
 
-def decomposed():
-    return ("meta" in store and "Sigmas" in store["meta"])
+def ready_to_decompose():
+    chroms = [v for v in store if v != "meta"]
+    if "meta" not in store:
+        return False
+    meta = store["meta"]
+    print(chroms)
+    for ch1 in chroms:
+        for ch2 in chroms:
+            if "{}_{}".format(ch1, ch2) not in meta and "{}_{}".format(ch2, ch1) not in meta:
+                return False
+    return True
 
 def filtered():
     chrom = [key for key in store if key != "meta"][0]
@@ -53,14 +64,13 @@ class CovarianceAggregator(object):
             self.r0 = 0
             self.r1 = int(win_size)
             self.r2 = int(win_size/2)
-            self.send_request({})
-            CovarianceAggregator.__instance = self
             self.thresh = thresh
+            CovarianceAggregator.__instance = self
 
     @staticmethod
     def get_instance(num_clients, win_size):##TODO this is dangerous. If num_clients or win_size changes
         if CovarianceAggregator.__instance is None:
-            return CovarianceAggregator(num_clients, win_size)
+            CovarianceAggregator(num_clients, win_size)
         return CovarianceAggregator.__instance
     
     def send_request(self, data):
@@ -131,12 +141,93 @@ class CovarianceAggregator(object):
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
 #            self.tqdm.update(self.r2)
 
-def report_pos(client_name):
+def report_pos(client_names=None):
+    if client_names is None:
+        client_names = clients
     for chrom in store:
         if chrom == "meta":
             continue
-        data = {}
-        data[chrom] = store[f"{chrom}/PCA_passed"]
-        msg = pickle.dumps(data)
-        requests.post(f'http://{client["external_host"]}:{client_name["port"]}/api/pca/pcapos', msg)
+        for client in client_names:
+            data = {}
+            data[chrom] = store[f"{chrom}/PCA_passed"].value
+            msg = pickle.dumps(data)
+            requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/pcapos', msg)
+
+
+def store_covariance(client_name, data):
+    # store the chunks in the store. build on them 
+    msg = pickle.loads(data)
+    ch1 = msg["CH1"] 
+    ch2 = msg["CH2"]
+    logging.info("dealing with {}_{}".format(ch1, ch2))
+    if "meta" not in store:
+        store.create_group("meta")
+    group = store["meta"]
+    #if 'metadata' in msg:
+    #    metadata = msg['metadata']
+    #    if 'namespace' in metadata:
+    #        namespace = metadata['namespace']
+    #        logging.info(f'buildCov() namespace: {namespace}')
+    # iter_number = msg['curr_iter']
+    # logging.info(f'Reading iteration number {iter_number}')
+    mat = msg["MAT"]
+    cov_name = "{}_{}".format(ch1, ch2)
+    logging.info(cov_name)
+    if cov_name in group:
+        #mat += group[cov_name].value
+        stored = group[cov_name]
+        stored[:,:] += mat
+    else: 
+        group.create_dataset(cov_name, data=mat)
+    logging.info(cov_name)
+    if "E" in msg:
+        logging.info("Finished storing covariances")
+
+
+def eigenDecompose(n_components=10):
+    chroms = sorted([v for v in store.keys() if v != 'meta'], key=int)
+    cov_size = 0
+    meta = store["meta"]
+    if "Vs" not in meta:
+        for chrom in chroms: 
+            cov_size += meta["{}_{}".format(chrom, chrom)].shape[0]
+        logging.info("Starting covariance matrix of size {} x {}".format(
+            cov_size, cov_size))
+        cov = np.empty((cov_size, cov_size), dtype=np.float32)
+        i_old = 0
+        for chrom1 in chroms:
+            j_old = 0
+            for chrom2 in chroms:
+                if chrom2 > chrom1: 
+                    continue
+                cov_name = "{}_{}".format(chrom1, chrom2)
+                if cov_name in meta:
+                    pcov = meta[cov_name].value
+                    print(cov_name, pcov.shape)
+                    cov[i_old:i_old+pcov.shape[0], j_old:j_old+pcov.shape[1]] = pcov
+                    cov[j_old:j_old+pcov.shape[1], i_old:i_old+pcov.shape[0]] = pcov.T
+                    j_old += pcov.shape[1]
+            i_old += pcov.shape[0]
+        cov /= (cov.shape[0])
+        sigma, v = eig(cov, k=n_components, ncv=3*n_components)
+        sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
+        v = np.array(v)
+        sigma = np.array(sigma)
+        sigma[sigma < 0] = 0
+        meta.create_dataset('Sigmas', data = sigma)
+        meta.create_dataset('Vs', data = v)
+    else:
+        logging.info("Eigenvalue decomposition is already done")
+        sigma = meta["Sigmas"].value
+        v = meta["Vs"].value
+    sigma = np.sqrt(sigma) * np.sqrt(v.shape[0])
+    inv_sigma = sigma.copy()
+    inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
+    print(chroms)
+    msg = {"ISIG": inv_sigma, "V": v, "CHROMS": chroms}
+    msg = pickle.dumps(msg)
+    for client in clients: 
+        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/eig',
+            data=msg)
+
 

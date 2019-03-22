@@ -10,6 +10,7 @@ from celery import current_app
 import h5py
 import numpy as np
 from plinkio import plinkfile
+from sklearn.utils.extmath import svd_flip
 
 
 # internal lib
@@ -29,14 +30,17 @@ class LdReporter(object):
             self.r1, self.r2 = win_size, int(win_size/2)
             LdReporter.__instance = self
             pfile = client_config["plinkfile"]
-            self.store = h5py.File(shared.get_plink_store(pfile), 'a')
+            store_name = shared.get_plink_store(pfile)
+            self.store = h5py.File(store_name, 'r')
             self.chroms = [key for key, items in self.store.items() if key != "meta"]
             LdReporter.__instance = self
+
+            print("initiated")
 
     @staticmethod
     def get_instance(win_size, client_config):
         if LdReporter.__instance is None:
-            return LdReporter(win_size, client_config)
+            LdReporter(win_size, client_config)
         return LdReporter.__instance
 
     def update(self, data, client_config):
@@ -83,9 +87,16 @@ def store_filtered(message, client_config):
     pfile = client_config["plinkfile"]
     msg = pickle.loads(message)
     with h5py.File(shared.get_plink_store(pfile), 'a') as store:
-        for chrom, val in msg:
-            dset = store.require_dataset(f"{key}/PCA_passed", val.shape, dtype = val.dtype)
-            dset[:] = val
+        for chrom, val in msg.items():
+            mask = store["{}/PCA_mask".format(chrom)]
+            if "non_ld_mask" not in store[chrom]:
+                pcmask = mask.value
+                dset = store.require_dataset(f"{chrom}/non_ld_mask", pcmask.shape, dtype = pcmask.dtype)
+                dset[:] = pcmask
+            else:
+                pcmask = store[f"{chrom}/non_ld_mask"].value
+                pcmask[pcmask] = val
+                mask[:] = pcmask
 
 
 def report_cov(client_config):
@@ -96,13 +107,12 @@ def report_cov(client_config):
         mat[ind, :] /= sd[ind].reshape(np.sum(ind),1)
         mat[np.isnan(mat)] = 0
         return mat
-    pfile = client_config["plinkfile"]
-    msg = {}
+    pfile = shared.get_plink_store(client_config["plinkfile"])
     with h5py.File(pfile, 'r') as store:
         n = store.attrs["n"]
-        for ch1 in store:
-            if ch1 == "meta":
-                continue
+        chroms = sorted([ch for ch in store if ch != "meta"], key=int)
+        size = 0
+        for chi, ch1 in enumerate(chroms):
             group = store[ch1]
             tokeep = group['PCA_mask'].value
             pos = group["positions"].value[tokeep]
@@ -112,10 +122,11 @@ def report_cov(client_config):
             for i, snp1 in enumerate(pos):
                 g1[i, :] = group[str(snp1)].value
             g1 = standardize_mat(g1, af1, sd1)
-            for ch2 in store: 
-                if ch2 == "meta":
+            size += i
+            for j, ch2 in enumerate(chroms):
+                if j > chi: 
                     continue
-                print(f"Reporting cov: {ch1}_{ch2}")
+                msg = {}
                 group = store[ch2]
                 tokeep = group['PCA_mask'].value
                 af2 = group["MAF"].value[tokeep]
@@ -128,8 +139,43 @@ def report_cov(client_config):
                 msg["CH1"] = ch1
                 msg["CH2"] = ch2
                 msg["MAT"] = g1.dot(g2).astype(np.float32)
-                if "E" in message:
+                print(f"Reporting cov: {ch1}_{ch2}: {len(g1)} x {len(pos)}")
+                if ch1 == chroms[-1] and ch2 == chroms[-1]:
                     msg["E"] = True
-                print(ch1, ch2)
                 msg = pickle.dumps(msg)
+                #time.sleep(1)
                 HTTPResponse.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'])
+        print(f"Final size will be {size}")
+
+
+def pca_projection(data, client_config):
+    message = pickle.loads(data)
+    inv_sigma = message["ISIG"]
+    v = message["V"]
+    chroms = message["CHROMS"]
+    pfile = shared.get_plink_store(client_config["plinkfile"])
+    with h5py.File(pfile, 'a') as store:
+        dset = store["meta"]
+        pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
+        n = 0
+        for chrom in chroms:
+            n += np.sum(store[f"{chrom}/PCA_mask"])
+        num_inds = store.attrs["n"]
+        arr = np.empty((num_inds, n))
+        offset = 0
+        for chrom in chroms:
+            group = store[str(chrom)]
+            tokeep    = group["PCA_mask"].value
+            positions = group["positions"].value[tokeep]
+            for i, position in enumerate(positions): 
+                arr[:, offset+i] = group[str(position)].value
+            offset += i
+        u = arr.dot(v.T).dot(np.diag(inv_sigma))
+        u, v = svd_flip(u, v, u_based_decision=False)
+        pca_vt = dset.require_dataset('pca_v.T', shape=v.shape,
+            dtype=np.float32)
+        pca_vt[:,:] = v
+        pca_u = dset.require_dataset('pca_u', shape=u.shape,
+            dtype=np.float32)
+        pca_u[:,:] = u
+        print("Done with projection!")

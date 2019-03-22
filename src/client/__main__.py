@@ -137,7 +137,7 @@ def main():
         logging.error('Could not register self with server, exiting...')
         sys.exit(1)
 
-    app.run(host=client['listen_host'], port=client['port'])
+    app.run(host=client['listen_host'], port=client['port'], threaded=False)
 
 
 if __name__ == '__main__':
