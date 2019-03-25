@@ -43,8 +43,9 @@ def start_task(task_name):
             print("starting eigen decomposition")
             task_pca.eigenDecompose(n_components=10)
     elif task_name == Commands.ASSO:
-        print("Running Associations")
-        task_ass.start_association()
+        print("Starting Associations")
+        # setup
+        ass_agg = task_ass.LogisticAdmm(npcs=10, active=2)
 
 
 def start_subtask(task_name, subtask_name, client_name):

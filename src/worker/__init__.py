@@ -104,3 +104,8 @@ def report_cov(client_config):
 def pca_projection(data, client_config):
     task_pca.pca_projection(data, client_config)
 
+
+@app.task(name='tasks.asso')
+def compute_logistic_reg(message, client_config):
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10)
+      lr_agg.update(message, client_config)

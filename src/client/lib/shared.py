@@ -26,3 +26,10 @@ def get_plink_store(pfile):
     write_to = Settings.local_scratch
     store_name = os.path.join(write_to, prefix + basename + '.h5py')
     return store_name
+
+
+def get_covar_file():
+    dirname, basename = os.path.split(plinkfile)
+    prefix = os.path.basename(dirname)
+    covar_file = os.path.join(prefix, "HydraPheno")
+    return covar_file

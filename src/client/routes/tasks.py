@@ -110,5 +110,16 @@ def pca_projection():
     return HTTPResponse.create_response(200)
 
 
+@bp.route('/asso', methods=['POST'])
+def pca_projection():
+    logging.info('Regression update')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.asso',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
 def adder_fn(a, b):
     return a + b
