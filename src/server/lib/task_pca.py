@@ -16,7 +16,6 @@ from scipy.sparse.linalg import eigsh as eig
 from lib.settings import Settings, Options, PCAFilterNames, Commands
 from lib.client_registry import Registry
 from . import task_qc
-from lib.corr import corr
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")

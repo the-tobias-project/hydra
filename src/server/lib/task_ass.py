@@ -29,6 +29,7 @@ class LogisticAdmm(object):
         else:
             self.num_clients = num_clients
             self.estimates = {}
+            self.small_model = {}
             self.iters = {}
             self.chroms = [v for v in store.keys() if v != 'meta']
             self.activ_chrom = self.chroms[:active]
@@ -56,31 +57,36 @@ class LogisticAdmm(object):
                 data=to_send)
 
     def update(self, message):
-        chrom = message["CHROM"]
-        if chrom in self.finished:
-            return
+        message = pickle.loads(message)
         z_hat = message["VALS"]
-        if chrom in self.estimates:
-            prev = self.estimates[chrom]
-            if prev[1] == 1:
-                beta = (prev[0] + z_hat)/(self.connections)
-                self.iters[chrom] += 1
-                if self.iters[chrom] == self.max_iters:
-                    write_or_replace(self.store, chrom + "/results", beta)
-                    del self.estimates[chrom]
-                    self.finished.add(chrom)
-                    chroms = [key for key in self.store if key != 'meta']
-                    if len(self.finished) == len(chroms):
-                        self.logger.info("We are all done with the regression")
-                        self.server.get_response(Commands.all_commands)
-                self.estimates[chrom] = [beta, self.connections - 1]
-                self.logger.info("Finished iteration{1} on chrom {}".format(self.iters[chrom], chrom))
-                self.server.message(encode({"TASK": Commands.ASSO, 
-                  "SUBTASK": None, "CHROM": chrom, "VALS": beta}))
-            else:
-                self.estimates[chrom] = [prev[0] + z_hat , prev[1]-1]
+        model = message["Estimated"]
 
-        else: # Not in dictionary yet
-            self.estimates[chrom] = [z_hat, self.connections - 1]
-            self.iters[chrom] = 1
+            self.small_model = update_estimate(z_hat, self.small_model)
+        else:
+            self.estimates = self.update_estimate(z_hat, self.estimates)
+
+
+    def update_estimate(self, z_hat, model):
+            if model in self.estimates:
+                prev = self.estimates[model]
+                if prev[1] == 1:
+                    beta = (prev[0] + z_hat)/(self.connections)
+                    self.iters[model] += 1
+                    if self.iters[model] == self.max_iters:
+                        write_or_replace(self.store, model + "/coefs", beta)
+                        del self.estimates[model]
+                        self.finished.add(model)
+                        chroms = [key for key in self.store if key != 'meta']
+                        if len(self.finished) == len(chroms) + 1:
+                            logging.info(f"Updating chr{chrom}. And now we are done!")
+                    self.estimates[model] = [beta, self.connections - 1]
+                    logging.info(f"Finished iteration{self.iters[model]} on chrom {model}")
+                    msg = {"Estimated": model, "VALS": beta}
+                    self.send_request(msg)
+                else:
+                    self.estimates[model] = [prev[0] + z_hat , prev[1]-1]
+
+            else: # Not in dictionary yet
+                self.estimates[model] = [z_hat, self.connections - 1]
+                self.iters[model] = 1
 

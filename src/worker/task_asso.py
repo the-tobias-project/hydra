@@ -15,10 +15,11 @@ from plinkio import plinkfile
 from client.lib import shared
 from lib import HTTPResponse
 from lib.utils import write_or_replace
+from optimizationAux import *
 
 class LogisticAdmm(object):
     __instance = None
-    def __init__(self, covar_numbers, npcs):
+    def __init__(self, covar_numbers, npcs, threshold=None):
         if LdReporter.__instance is not None:
             return 
         else:
@@ -28,6 +29,11 @@ class LogisticAdmm(object):
             self.store = h5py.File(store_name, 'a')
             self.load_Y(covar_numbers[-1])
             self.load_covar_mat(npcs, covar_numbers[:-1])
+            self.threshold = None
+            self.warm_start = 0
+            self.previous_estimates = {}
+            self.prev_cov_estimate = None
+            self.client_config = None
             LdReporter.__instance = self
 
     @staticmethod
@@ -46,6 +52,8 @@ class LogisticAdmm(object):
         store = self.store
         n = store.attrs["n"]
         p = npcs + len(other_covars) + 2 # intercept + snp
+        if self.threshold is None:
+            self.threshold = 3*float(p)/n   # Don't run regression unless you have at least this AF
         self.covariates = np.empty((n, p))
         # Load up scores 
         scores = store["meta/pca_u"].value[:,:npcs]
@@ -61,39 +69,74 @@ class LogisticAdmm(object):
 
     def update(self, data, client_config):
         data = pickle.loads(data)
-        n = self.store.attrs['n']
-        msg = {}
-        if self.r3 == 0: # fake start the first round
-            for chrom in self.chroms: 
-                # if the length is less than r1, you deserve an error. 
-                # No apologies 
-                tags = self.store["{}/PCA_passed".format(chrom)]
-                data[chrom] = tags[0:self.r1]
-        for key, state in data.items():
-            if key == "TASK" or key == "SUBTASK":
+        self.client_config = client_config
+        y = self.Ys
+        model = data["Estimated"]
+        if model == "Small":
+            self.covariate_regression(y)
+        else:
+            self.run_logistic_regression(y, model)
+            pass # perform snp regression
+
+    def run_covar_regression(self, y, warm_start = None, rho=1.0, alpha=1.0):
+        # instead of making many function calls, I'll separate the covariate and chromosome regressions
+        store = self.store
+        n = store.attrs["n"]
+        y = y.reshape(n)
+        ncov = self.covariates.shape[1]
+        estimates = np.zeros((ncov-2, 1))
+        estimates[:, 0] = 0
+        idx = [i for i in range(self.covariates.shape[1]) if i != 1]
+        covariates = self.covariates[:,idx]
+        if self.prev_cov_estimate is not None:
+            z_hat = self.prev_cov_estimate
+            all_Us = self.prev_Us + z_hat - warm_start
+        else:
+            all_Us = 0
+        if warm_start is None:
+            estimates[:, 0] = bfgs_more_gutted(covariates, np.zeros((ncov)),
+                np.zeros((ncov,)), rho, estimates[:,i], ncov)
+            z_hat = alpha * estimates
+        else:
+            estimates[:,0] = bfgs_more_gutted(covariates,all_Us[:,i],
+                warm_start[:,i], rho, z_hat[:, i], ncov)
+            z_hat = alpha * estimates + (1-alpha) * warm_start
+        self.prev_cov_estimate = estimates
+        self.previous_Us = all_Us
+        msg = pickle.dumps({"VALS": z_hat, "Estimated":"Small"})
+        HTTPResponse.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
+            self.client_config['name'])
+
+    def run_logistic_regression(self, y, chrom=None, warm_start=None, rho=1.0, alpha=1.0):
+        store = self.store
+        n = store.attrs["n"]
+        y = y.reshape(n)
+        covariates = self.covariates
+        group = store[chrom]
+        positions = group["positions"]
+        ncov = self.covariates.shape[1]
+        estimates = np.zeros((ncov, len(positions)))
+        estimates[:, -1] = 0
+        af = group["MAF"]
+        if chrom in self.previous_estimates:
+            z_hat = self.previous_estimates[chrom]
+            all_Us = self.previous_Us[chrom] + z_hat - warm_start
+        else:
+            all_Us = 0
+        for i, position in enumerate(positions):
+            if af[i] < self.threshold or (1-af[i]) < self.threshold:
+                estimates[:, i] = np.nan
                 continue
-            chrom = key
-            tags = self.store["{}/PCA_passed".format(chrom)]
-            if state[0] == "E": # Finished with this chrom
-                if len(data) == 1: # Done with everything
-                    msg = pickle.dumps({})
-                    HTTPResponse.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
-                        client_config['name'])
-                    print("Done with LD pruning")
-                    return
-                continue
+            covariates[:,1] = group[str(position)].value * -y
+            if warm_start is None:
+                estimates[:,i] = bfgs_more_gutted(covariates, np.zeros((ncov)), np.zeros((ncov,)), rho, estimates[:,i], ncov)
+                z_hat = alpha * estimates
             else:
-                tokeep = state
-                end = self.r3 + len(tokeep)
-            pos = self.store["{}/PCA_positions".format(chrom)]
-            positions = pos[self.r3: end]
-            positions = positions[tokeep]
-            genotypes = np.empty((n,len(positions)), dtype=np.float32)
-            for i, snp in enumerate(positions):
-                genotypes[:,i] = self.store["{}/{}".format(chrom, snp)].value
-            corr = nancorr(genotypes)
-            msg[chrom] = corr
-        msg = pickle.dumps(msg)
-        HTTPResponse.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'])
-        self.r3 += self.r2
-        print(self.r3)
+                estimates[:,i] = bfgs_more_gutted(covariates, all_Us[:,i],
+                    warm_start[:,i], rho, z_hat[:, i], ncov)
+                z_hat = alpha * estimates + (1-alpha) * warm_start
+        self.previous_estimates[chrom] = estimates
+        self.previous_Us[chrom] = all_Us
+        msg = pickle.dumps({"Estimated": chrom, "VALS": z_hat})
+        HTTPResponse.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
+            self.client_config['name'])

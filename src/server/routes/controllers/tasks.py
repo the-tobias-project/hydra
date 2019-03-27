@@ -80,6 +80,11 @@ def start_subtask(task_name, subtask_name, client_name):
             message_clients("pca/cov")
         elif subtask_name == "COV":
             task_pca.store_covariance(client_name, request.data)
+    elif task_name.startswith(Commands.ASSO):
+        if subtask_name == "estimate":
+            ass_agg = task_ass.LogisticAdmm(npcs=10, active=2)
+            ass_agg.update(request.data)
+
 
 
     return HTTPResponse.create_response(200)
