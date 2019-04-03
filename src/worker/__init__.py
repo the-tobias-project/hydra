@@ -11,7 +11,7 @@ from celery.utils.log import get_task_logger
 
 # internal lib
 from lib.settings import Settings
-from worker import task_init, task_qc, task_pca
+from worker import task_init, task_qc, task_pca, task_asso
 
 sys.path.append(os.path.abspath('../lib'))
 sys.path.append(os.path.abspath('../client'))
@@ -105,7 +105,26 @@ def pca_projection(data, client_config):
     task_pca.pca_projection(data, client_config)
 
 
+@app.task(name='tasks.regression_init')
+def initialize_logistic_reg(client_config):
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10, client_config)
+
+
 @app.task(name='tasks.asso')
 def compute_logistic_reg(message, client_config):
-    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10)
-      lr_agg.update(message, client_config)
+    print("Running regression")
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10, client_config)
+    lr_agg.update(message, client_config)
+
+
+@app.task(name='tasks.adjust')
+def adjust_covariates(message, client_config):
+    print("adjusting covariates")
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10, client_config)
+    lr_agg.global_standardize(message, client_config)
+
+
+@app.task(name='tasks.loglikelihood')
+def compute_log_likelihood(message, client_config):
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10, client_config)
+    lr_agg.send_likelihood(message, client_config)

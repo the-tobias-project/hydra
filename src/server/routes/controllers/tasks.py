@@ -9,7 +9,7 @@ import requests
 from lib import tasks
 from lib import HTTPResponse
 from lib.settings import Commands
-from server.lib import task_init, task_qc, task_pca
+from server.lib import task_init, task_qc, task_pca, task_ass
 from lib.client_registry import Registry
 
 
@@ -45,7 +45,7 @@ def start_task(task_name):
     elif task_name == Commands.ASSO:
         print("Starting Associations")
         # setup
-        ass_agg = task_ass.LogisticAdmm(npcs=10, active=2)
+        ass_agg = task_ass.LogisticAdmm.get_instance(npcs=10, active=2)
 
 
 def start_subtask(task_name, subtask_name, client_name):
@@ -80,12 +80,15 @@ def start_subtask(task_name, subtask_name, client_name):
             message_clients("pca/cov")
         elif subtask_name == "COV":
             task_pca.store_covariance(client_name, request.data)
+
     elif task_name.startswith(Commands.ASSO):
-        if subtask_name == "estimate":
-            ass_agg = task_ass.LogisticAdmm(npcs=10, active=2)
+        ass_agg = task_ass.LogisticAdmm.get_instance(npcs=10, active=2)
+        if subtask_name == "adjust":
+            ass_agg.update_stats(request.data)
+        elif subtask_name == "estimate":
             ass_agg.update(request.data)
-
-
+        elif subtask_name == "pval":
+            ass_agg.update_pval(request.data)
 
     return HTTPResponse.create_response(200)
 

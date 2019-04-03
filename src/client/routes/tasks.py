@@ -110,11 +110,44 @@ def pca_projection():
     return HTTPResponse.create_response(200)
 
 
-@bp.route('/asso', methods=['POST'])
-def pca_projection():
+@bp.route('/asso/adjust', methods=['POST'])
+def data_adjust():
+    logging.info('Covariate update')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.adjust',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
+@bp.route('/asso/letTheDogsOut', methods=['POST'])
+def lr_init():
+    logging.info('Initializing Regression')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.regression_init',
+                            [app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
+@bp.route('/asso/estimate', methods=['POST'])
+def lr_association():
     logging.info('Regression update')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.asso',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
+@bp.route('/asso/coef', methods=['POST'])
+def compute_likelihoods():
+    logging.info('Regression update')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.loglikelihood',
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
