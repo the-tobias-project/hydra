@@ -1,0 +1,82 @@
+# stdlib
+import os
+import pickle
+import socket
+import sys
+import time
+
+# third party lib
+from celery import current_app
+import h5py
+import numpy as np
+from plinkio import plinkfile
+
+
+# internal lib
+from client.lib import shared
+from lib import HTTPResponse
+from lib.utils import write_or_replace
+from lib.corr import nancorr, process_plink_row
+
+
+def report_ld(data, client_config):
+    pfile = client_config["plinkfile"]
+    with h5py.File(shared.get_plink_store(pfile), 'a') as store:
+        
+
+def init_store(client_config):
+    plinkToH5(client_config)
+    print("preparing counts")
+    report_counts(client_config)
+    print('Finished reporting counts')
+
+
+def send_counts_to_server(data, client_config):
+    print('sending counts to server')
+    client_name = client_config['name']
+    data = pickle.dumps(data)
+    HTTPResponse.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name)
+    print('sent counts to server')
+
+
+def init_stats(message, client_config):
+    print('Inside init_stats')
+    # Wait on previous tasks to finish
+    i = current_app.control.inspect()
+    client_name = client_config['name']
+    while True:
+        active_tasks = i.active()[f'celery@{client_name}']
+        dependent_tasks = list(filter(lambda x: x['name'] == 'tasks.init_store', active_tasks))
+        if len(dependent_tasks) > 0:
+            print('Waiting on tasks.init_store to finish')
+            time.sleep(.1)
+        else:
+            break
+    print('Resuming with init_stats')
+    message = pickle.loads(message)
+    chrom = message["CHROM"]
+    print(f'Chrom: {chrom}')
+    pfile = client_config['plinkfile']
+    with h5py.File(shared.get_plink_store(pfile), 'a') as store:
+        chrom_group = store[str(chrom)]
+        if "MISS" in message:
+            vals = message["MISS"]
+            task = "not_missing_per_snp"
+            dset = chrom_group.create_dataset(task, data=1 - vals)
+        if "AF" in message:
+            vals = message["AF"]
+            task = 'MAF'
+            dset = chrom_group.create_dataset(task, data=vals)
+        if "HWE" in message:
+            vals = message["HWE"]
+            task = "hwe"
+            dset = chrom_group.create_dataset(task, data=vals)
+        if "VAR" in message:
+            vals = message["VAR"]
+            task = "VAR"
+            dset = chrom_group.create_dataset(task, data=vals)
+    print('Finished with init_stats')
+
+    client_name = client_config['name']
+    status = f'Finished with init stats for chrom {chrom}'
+    HTTPResponse.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST')

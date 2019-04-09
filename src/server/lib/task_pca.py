@@ -16,6 +16,7 @@ from scipy.sparse.linalg import eigsh as eig
 from lib.settings import Settings, Options, PCAFilterNames, Commands
 from lib.client_registry import Registry
 from . import task_qc
+from lib.corr import corr
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
@@ -142,11 +143,13 @@ class CovarianceAggregator(object):
 
 def report_pos(client_names=None):
     if client_names is None:
-        client_names = clients
+        client_list = clients
+    else:
+        client_list = list(filter(lambda x: x['name'] not in client_names, clients))
     for chrom in store:
         if chrom == "meta":
             continue
-        for client in client_names:
+        for client in client_list:
             data = {}
             data[chrom] = store[f"{chrom}/PCA_passed"].value
             msg = pickle.dumps(data)
@@ -176,7 +179,7 @@ def store_covariance(client_name, data):
         #mat += group[cov_name].value
         stored = group[cov_name]
         stored[:,:] += mat
-    else: 
+    else:
         group.create_dataset(cov_name, data=mat)
     logging.info(cov_name)
     if "E" in msg:
@@ -184,11 +187,11 @@ def store_covariance(client_name, data):
 
 
 def eigenDecompose(n_components=10):
-    chroms = sorted([v for v in store.keys() if v != 'meta'], key=int)
+    chroms = sorted([int(v) for v in store.keys() if v != 'meta'])
     cov_size = 0
     meta = store["meta"]
     if "Vs" not in meta:
-        for chrom in chroms: 
+        for chrom in chroms:
             cov_size += meta["{}_{}".format(chrom, chrom)].shape[0]
         logging.info("Starting covariance matrix of size {} x {}".format(
             cov_size, cov_size))
@@ -197,7 +200,7 @@ def eigenDecompose(n_components=10):
         for chrom1 in chroms:
             j_old = 0
             for chrom2 in chroms:
-                if chrom2 > chrom1: 
+                if chrom2 > chrom1:
                     continue
                 cov_name = "{}_{}".format(chrom1, chrom2)
                 if cov_name in meta:

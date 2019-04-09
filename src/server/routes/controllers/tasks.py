@@ -1,5 +1,6 @@
 # stdlib
 import logging
+import pdb
 
 # third party lib
 from flask import request
@@ -35,10 +36,11 @@ def start_task(task_name):
                 filters = task_qc.split_command(task_name)
                 print(f"Specified pruning filters :{filters}")
                 task_pca.start_pca_filters(filters)
-            print("Reporting Filtered Sites")
-            task_pca.report_pos()
-            print("Reporting Filtered Sites")
-            message_clients("pca/cov")
+            else:
+                print("Reporting Filtered Sites")
+                task_pca.report_pos()
+                print("Reporting Filtered Sites")
+                message_clients("pca/cov")
         else:
             print("starting eigen decomposition")
             task_pca.eigenDecompose(n_components=10)
@@ -65,6 +67,7 @@ def start_subtask(task_name, subtask_name, client_name):
                 print("We can move on")
 
     elif task_name.startswith(Commands.PCA):
+        #pdb.set_trace()
         if subtask_name == "FIN":
             if task_qc.filter_finished(client_name, Commands.PCA):
                 print("Done with PCA filters")

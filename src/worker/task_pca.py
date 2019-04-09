@@ -31,7 +31,7 @@ class LdReporter(object):
             LdReporter.__instance = self
             pfile = client_config["plinkfile"]
             store_name = shared.get_plink_store(pfile)
-            self.store = h5py.File(store_name, 'r')
+            self.store = h5py.File(store_name, 'a')
             self.chroms = [key for key, items in self.store.items() if key != "meta"]
             LdReporter.__instance = self
 
@@ -138,8 +138,8 @@ def report_cov(client_config):
                 g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
                 msg["CH1"] = ch1
                 msg["CH2"] = ch2
+                print(f"Reporting cov: {ch1}_{ch2}: {g1.shape} x {g2.shape}")
                 msg["MAT"] = g1.dot(g2).astype(np.float32)
-                print(f"Reporting cov: {ch1}_{ch2}: {len(g1)} x {len(pos)}")
                 if ch1 == chroms[-1] and ch2 == chroms[-1]:
                     msg["E"] = True
                 msg = pickle.dumps(msg)
