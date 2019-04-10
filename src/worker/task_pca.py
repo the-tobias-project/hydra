@@ -124,7 +124,7 @@ def report_cov(client_config):
             g1 = standardize_mat(g1, af1, sd1)
             size += i
             for j, ch2 in enumerate(chroms):
-                if j > chi: 
+                if j > chi:
                     continue
                 msg = {}
                 group = store[ch2]
@@ -166,9 +166,13 @@ def pca_projection(data, client_config):
         for chrom in chroms:
             group = store[str(chrom)]
             tokeep    = group["PCA_mask"].value
+            af = group["MAF"].value[tokeep]
+            sd = np.sqrt(group["VAR"].value[tokeep])
             positions = group["positions"].value[tokeep]
-            for i, position in enumerate(positions): 
-                arr[:, offset+i] = group[str(position)].value
+            for i, position in enumerate(positions):
+                val = (group[str(position)].value - 2 * af[i])/sd[i]
+                val[np.isnan(val)] = 0
+                arr[:, offset+i] = val
             offset += i
         u = arr.dot(v.T).dot(np.diag(inv_sigma))
         u, v = svd_flip(u, v, u_based_decision=False)
