@@ -121,7 +121,7 @@ def data_adjust():
     return HTTPResponse.create_response(200)
 
 
-@bp.route('/asso/letTheDogsOut', methods=['POST'])
+@bp.route('/asso/initialize', methods=['POST'])
 def lr_init():
     logging.info('Initializing Regression')
     client_name = app.config['client']['name']

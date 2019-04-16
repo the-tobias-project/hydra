@@ -10,7 +10,7 @@ from lib.settings import Settings
 
 
 names = ["BioME", "MEC_CA", "MEC_HI", "SOL_B", "SOL_M", "SOL_S", "SOL_C", "WHI"]
-names = ["SOL_B", "SOL_M", "SOL_S"]
+#names = ["SOL_B", "SOL_M", "SOL_S"]
 
 
 def worker(plinkList, args):
