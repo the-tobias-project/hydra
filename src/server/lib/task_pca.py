@@ -44,9 +44,9 @@ def filtered():
 
 def start_pca_filters(filters):
    logging.info("Initiating PCA filters...")
-   qc_subset_filters = {key: value for key,value in filters.items() 
+   qc_subset_filters = {key: value for key,value in filters.items()
       if key != PCAFilterNames.PCA_LD}
-   if qc_subset_filters: # Perform the qc like filters 
+   if qc_subset_filters: # Perform the qc like filters
       task_qc.start_local_qc_task(qc_subset_filters, prefix="PCA_")
       filters["remove"] = False
       task_qc.start_client_qc_task(filters, stage=Commands.PCA)
@@ -56,7 +56,7 @@ class CovarianceAggregator(object):
     __instance = None
     def __init__(self, num_clients, win_size=50, thresh=0.2):
         if CovarianceAggregator.__instance is not None:
-            return 
+            return
         else:
             self.num_clients = num_clients
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
@@ -211,11 +211,12 @@ def eigenDecompose(n_components=10):
                     j_old += pcov.shape[1]
             i_old += pcov.shape[0]
         cov /= (cov.shape[0])
-        sigma, v = eig(cov, k=n_components, ncv=3*n_components)
+        sigma, v = eig(cov, k=n_components, ncv=3*n_components)#, maxiter=20*cov.shape[0])
         sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
         v = np.array(v)
         sigma = np.array(sigma)
         sigma[sigma < 0] = 0
+        print(sigma)
         meta.create_dataset('Sigmas', data = sigma)
         meta.create_dataset('Vs', data = v)
     else:
@@ -228,7 +229,7 @@ def eigenDecompose(n_components=10):
     print(chroms)
     msg = {"ISIG": inv_sigma, "V": v, "CHROMS": chroms}
     msg = pickle.dumps(msg)
-    for client in clients: 
+    for client in clients:
         requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/eig',
             data=msg)
 

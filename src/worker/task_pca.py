@@ -1,15 +1,11 @@
 # stdlib
 import os
 import pickle
-import socket
-import sys
 import time
 
 # third party lib
-from celery import current_app
 import h5py
 import numpy as np
-from plinkio import plinkfile
 from sklearn.utils.extmath import svd_flip
 
 
@@ -24,7 +20,7 @@ class LdReporter(object):
 
     def __init__(self, win_size, client_config):
         if LdReporter.__instance is not None:
-            return 
+            return
         else:
             self.r3 = 0
             self.r1, self.r2 = win_size, int(win_size/2)
@@ -122,7 +118,7 @@ def report_cov(client_config):
             for i, snp1 in enumerate(pos):
                 g1[i, :] = group[str(snp1)].value
             g1 = standardize_mat(g1, af1, sd1)
-            size += i
+            size += i+1
             for j, ch2 in enumerate(chroms):
                 if j > chi:
                     continue
@@ -157,11 +153,12 @@ def pca_projection(data, client_config):
     with h5py.File(pfile, 'a') as store:
         dset = store["meta"]
         pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
+        pca_sigma[:] = inv_sigma
         n = 0
         for chrom in chroms:
             n += np.sum(store[f"{chrom}/PCA_mask"])
         num_inds = store.attrs["n"]
-        arr = np.empty((num_inds, n))
+        arr = np.empty((num_inds, n), dtype=np.float32)
         offset = 0
         for chrom in chroms:
             group = store[str(chrom)]
@@ -173,7 +170,7 @@ def pca_projection(data, client_config):
                 val = (group[str(position)].value - 2 * af[i])/sd[i]
                 val[np.isnan(val)] = 0
                 arr[:, offset+i] = val
-            offset += i
+            offset += i+1
         u = arr.dot(v.T).dot(np.diag(inv_sigma))
         u, v = svd_flip(u, v, u_based_decision=False)
         pca_vt = dset.require_dataset('pca_v.T', shape=v.shape,

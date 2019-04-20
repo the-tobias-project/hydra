@@ -1,6 +1,7 @@
 # stdlib
 import logging
 import pdb
+import time
 
 # third party lib
 from flask import request
@@ -40,6 +41,7 @@ def start_task(task_name):
                 print("Reporting Filtered Sites")
                 task_pca.report_pos()
                 print("Reporting Filtered Sites")
+                time.sleep(.5)
                 message_clients("pca/cov")
         else:
             print("starting eigen decomposition")
@@ -80,7 +82,8 @@ def start_subtask(task_name, subtask_name, client_name):
             ld_agg.update(request.data)
         elif subtask_name == "PCAPOS":
             task_pca.report_pos([client_name])
-            message_clients("pca/cov")
+            time.sleep(.5) # Give time for the pos to get sent and stored
+            message_clients("pca/cov", client_name)
         elif subtask_name == "COV":
             task_pca.store_covariance(client_name, request.data)
 
@@ -102,9 +105,14 @@ def reset_states(state):
         instance.set_client_state(client["name"], state)
 
 
-def message_clients(message):
-    for client in Registry.get_instance().list_clients():
-        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/{message}')
+def message_clients(address, client_name=None):
+    clients = Registry.get_instance().list_clients()
+    if client_name is None:
+        client_list = clients
+    else:
+        client_list = list(filter(lambda x: x["name"]==client_name, clients))
+    for client in client_list:
+        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/{address}')
 
 
 
