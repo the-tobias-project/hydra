@@ -74,6 +74,7 @@ class MyClient(protocol.Protocol):
         reactor.callFromThread(self._message, data)
 
     def _message(self, data):
+        print("I send data")
         self.transport.write(data)
 
     def wait_for_and_process_next_message(self):

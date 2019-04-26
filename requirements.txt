@@ -6,9 +6,13 @@ tqdm==4.26.0
 numpy==1.15.2
 jsonschema==2.6.0
 scipy==1.1.0
+<<<<<<< HEAD
 pandas==0.24.1
 flask==1.0.2
 connexion==2.2.0
 sklearn
 celery==4.2.1
 billiard==3.5.0.4
+=======
+sklearn==
+>>>>>>> master
