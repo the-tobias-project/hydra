@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 # std lib
-import sys
 from subprocess import Popen, PIPE, DEVNULL
 import shlex
 import time
@@ -14,10 +13,9 @@ import tempfile
 from termcolor import colored
 
 # In house Lib
-from settings import Settings
+from src.lib.settings import Settings
 from utils import snps_match, compare_pca, compare_regression
 
-import pdb
 
 def process_finished(message):
     if message.startswith("Looks") or message.startswith("Indicate"):

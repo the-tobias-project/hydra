@@ -5,4 +5,5 @@ commitfile
 testData/*.gz
 testData/*.gz.*
 testData/*.vcf
+generated.api.yml
 

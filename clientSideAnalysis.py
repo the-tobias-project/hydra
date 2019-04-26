@@ -3,35 +3,34 @@
 # stdlib
 import time
 import sys
-import _pickle as pickle
 import os
 import logging
 
 # Third party lib
 import h5py
-import numpy as np
 from plinkio import plinkfile
 from sklearn.utils.extmath import svd_flip
 import tqdm
-from sklearn.metrics import log_loss
-from sklearn.linear_model import LogisticRegression as LR
+import requests
 
 # Internal lib
 from corr import nancorr, process_plink_row
-from settings import Settings, Commands, Options, QCOptions, PCAOptions, QCFilterNames, PCAFilterNames
+from src.lib.settings import Settings, Commands, QCFilterNames, PCAFilterNames
 from optimizationAux import *
-from utils import encode, decode, write_or_replace
+from utils import encode, write_or_replace
+
+# import cProfile, pstats, io
 
 
-import cProfile, pstats, io
 class ServerTalker(object):
     """Dispatches commands from/to the server"""
     def __init__(self, store_name, scratch, server):
-        self.store_name = store_name
+        self.name = server.name
+        self.store_name = store_name  # this is the plinkfile base name
         self.status = ""
         self.scratch = scratch
         self.server = server
-        self.store_path = self._store_path()
+        self.store_path = self._store_path()  # This is the path to the plinkfile's h5py file
         if not os.path.exists(scratch):
             os.makedirs(scratch)
         self.local_n = None
@@ -51,10 +50,12 @@ class ServerTalker(object):
 
     def _store_path(self):
         plinkName = self.store_name
+        logging.info(f'plinkName: {self.store_name}')
         dirname, basename = os.path.split(plinkName)
         prefix = os.path.basename(dirname)
         write_to = self.scratch
         store_name = os.path.join(write_to, prefix + basename + '.h5py')
+        logging.info(f'store_name: {store_name}')
         return store_name
 
     def plinkToH5(self):
@@ -87,8 +88,10 @@ class ServerTalker(object):
             write_or_replace(store, 'meta/id', ids, 'S11')
             del ids, affection
             # Read Demographic file
+            logging.info(f'Reading demographic file at {plinkName}.ind')
+            logging.info(f'File exists: {os.path.isfile(plinkName + ".ind")}')
             with open(plinkName + ".ind", 'r') as dem_f:
-                dem = [(row.split(",")[2]).encode("UTF8") for row in dem_f]
+                dem = [(row.split("\t")[2]).encode("UTF8") for row in dem_f]
                 write_or_replace(store, 'meta/regions', dem)
             # Read chromosome data
             current_chr = 1
@@ -108,7 +111,7 @@ class ServerTalker(object):
                         write_or_replace(current_group, 'counts', allcounts,
                             np.uint32)
                         msg = encode({"TASK": "INIT", "SUBTASK": "POS",
-                            "CHROM": current_chr, "POS": positions})
+                            "CHROM": current_chr, "POS": positions}, client_name=self.name)
                         self.server.message(msg)
                         positions = []
                         rsid = []
@@ -131,14 +134,15 @@ class ServerTalker(object):
                 write_or_replace(current_group, 'counts', allcounts, np.uint32)
                 msg = {"TASK": "INIT", "SUBTASK": "POS",
                     "CHROM": current_chr, "POS": positions}
-                self.server.message(encode(msg))
+                self.server.message(encode(msg, client_name=self.name))
 
     def dispatch(self, message):
         task = message["TASK"]
         subtask = message["SUBTASK"]
         if self.verbose:
             self.logger.info("Working on: {}".format(task))
-        self.status = "{}/{}".format(task, subtask) 
+        self.status = "{}/{}".format(task, subtask)
+        logging.info(self.status)
         if task == Commands.INIT:
             if subtask == "STORE":
                 self.plinkToH5()
@@ -210,6 +214,7 @@ class ServerTalker(object):
 
     def store_stats(self, message):
         chrom = message["CHROM"]
+        # logging.info(message)
         with h5py.File(self.store_path, 'a') as store: 
             chrom_group = store[str(chrom)]
             if "MISS" in message:
@@ -237,7 +242,7 @@ class ServerTalker(object):
             n = store.attrs["n"]
             countDict["START"] = True
             keys = [i for i in store.keys() if i != 'meta']
-            print(self.store_path)
+            logging.info(self.store_path)
             for chrom in keys:
                 countDict["n"] = int(n)
                 countDict["TASK"] = Commands.INIT
@@ -247,7 +252,7 @@ class ServerTalker(object):
                 countDict["COUNTS"] = count_arr
                 if chrom == keys[-1]:
                     countDict["END"] = True
-                self.server.message(encode(countDict))
+                self.server.message(encode(countDict, client_name=self.name))
                 time.sleep(.5)
 
 #################################### QC #######################################
@@ -426,8 +431,6 @@ class ServerTalker(object):
             mask[:] = pcmask
             del store["{}/PCA_passed".format(chrom)]
 
-
-
     def store_message(self, message, dset_name):
         for key, val in message.items():
             if key in ["TASK", "SUBTASK"]:
@@ -493,9 +496,6 @@ class ServerTalker(object):
             time.sleep(5)
             print(ch1, ch2)
             return (encode(msg))
-
-
-
 
 #    def report_covariance(self, chroms, mask_name):
 #        def standardize_mat(mat, af, sd):

@@ -1,24 +1,20 @@
 #!/usr/bin/env python 3
 
 # stdlib
-import sys
 import os
 import time
-import _pickle as pickle
 import logging
-import pdb
 
 # Third party lib
 import tqdm
 import numpy as np
 import h5py
-from plinkio import plinkfile
 from scipy.sparse.linalg import eigsh as eig
 
 # Internal lib
 from corr import corr, hweP
-from settings import Settings, Commands, Options, QCOptions, PCAOptions, QCFilterNames, PCAFilterNames
-from utils import encode, decode, write_or_replace
+from src.lib.settings import Settings, Commands, QCOptions, QCFilterNames, PCAFilterNames
+from utils import encode, write_or_replace
 
 #TODO documentation
 # Careful here, eigh uses https://software.intel.com/en-us/mkl-developer-reference-c-syevr behind the hood
@@ -51,7 +47,11 @@ class ServerTalker(object):
         self.logger.info("Now working on: {}".format(self.status))
 
     def dispatch(self,message):
-        task = message["TASK"]
+        if 'TASK' in message:
+            task = message["TASK"]
+            logging.info(f'Task: {task}')
+        else:
+            return
         self.task = task
         subtask = message["SUBTASK"]
         self.subtask = subtask
@@ -62,6 +62,7 @@ class ServerTalker(object):
             self.report_status()
         if self.task == Commands.INIT:
             if subtask == "POS":
+                logging.info('storing positions')
                 self.store_positions(message)
             elif subtask == "COUNT":
                 self.store_counts(message)
@@ -104,6 +105,7 @@ class ServerTalker(object):
 
     def store_counts(self, message):
         n = message["n"]
+        logging.info('storing counts')
         if "START" in message:
             if "N" not in self.store.attrs:
                 self.store.attrs["N"] = 0
@@ -113,12 +115,12 @@ class ServerTalker(object):
         dsetname = "{}/counts".format(chrom)
         if dsetname not in self.store:
             dset = self.store.require_dataset(dsetname, (size, 4)
-              , dtype=np.uint32)
+              , dtype=np.int64)
         else:
             dset = self.store[dsetname]
         counts = message["COUNTS"]
         homo_ref = n - np.sum(counts, axis = 1)[:, np.newaxis].astype(
-            np.uint32)
+            np.int64)
         dset[:] += np.hstack((homo_ref, counts))
         if "END" in message:
             self.counter -= 1
@@ -127,7 +129,6 @@ class ServerTalker(object):
                 self.report_status()
                 self.count_stats()
                 self.server.get_options()
-
 
     def count_stats(self):
         N = float(self.store.attrs["N"])
@@ -337,8 +338,16 @@ class ServerTalker(object):
         if "meta" not in self.store:
             self.store.create_group("meta")
         group = self.store["meta"]
+        if 'metadata' in msg:
+            metadata = msg['metadata']
+            if 'namespace' in metadata:
+                namespace = metadata['namespace']
+                logging.info(f'buildCov() namespace: {namespace}')
+        # iter_number = msg['curr_iter']
+        # logging.info(f'Reading iteration number {iter_number}')
         data = msg["MAT"]
         cov_name = "{}_{}".format(ch1, ch2)
+        logging.info(cov_name)
         if cov_name in group:
             data += group[cov_name].value
         write_or_replace(group, cov_name, data)

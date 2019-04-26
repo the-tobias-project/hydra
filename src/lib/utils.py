@@ -2,23 +2,47 @@
 
 # stdlib
 import _pickle as pickle
+import traceback
 
 # Third party lib
 from plinkio import plinkfile
 import numpy as np
 import h5py
 import pdb
+import json
 
 # In house lib
-from settings import Settings
 
 
-def encode(message):
-    return pickle.dumps(message) + Settings.PICKLE_STOP
+class NumpyEncoder(json.JSONEncoder):
+    """ Special json encoder for numpy types """
+    def default(self, obj):
+        # print(obj.keys())
+        if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16,
+                            np.uint32, np.uint64)):
+            return int(obj)
+        elif isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
+            return float(obj)
+        elif isinstance(obj, (np.ndarray,)): #### This is the fix
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def encode(message, client_name=None):
+    return pickle.dumps(message)
+    try:
+        if client_name is not None:
+            message['client_name'] = client_name
+        j = json.dumps(message, cls=NumpyEncoder).encode('utf-8')
+        return j
+    except:
+        print('oh nodes!')
+        print(traceback.format_exc())
 
 
 def decode(message):
     return pickle.loads(message)
+    return json.loads(message)
 
 
 def write_or_replace(group, name, val, dtype=None):
@@ -103,7 +127,6 @@ def snps_match(plinkName, store_name, position_dset=None):
     return False
 
 
-
 def compare_pca(plinkPCA, store_name, dsets_list):
     with h5py.File(store_name, 'r') as store:
         sigmas = store['meta/Sigmas'].value
@@ -138,11 +161,8 @@ def compare_regression(plinkRegression, store_name, dset_name="results"):
                 plinkSubset_ind = plinkResults[:,0] == int(key)
                 plinkSubset = plinkResults[plinkSubset_ind, :]
                 del plinkSubset_ind
-                
-          
 
     pass
-    
 
 
 if __name__ == '__main__':
