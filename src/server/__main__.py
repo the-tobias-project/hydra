@@ -52,7 +52,7 @@ def load_schemas():
     schema_files = filter(lambda x: x.endswith('.yml'), os.listdir(os.path.join(dir_path, *schema_dir)))
 
     with io.open(os.path.join(*schema_dir, BASE_SCHEMA), 'r') as base_api:
-        api = yaml.load(base_api)
+        api = yaml.load(base_api, Loader=yaml.SafeLoader)
 
     for file in schema_files:
         if file == BASE_SCHEMA:

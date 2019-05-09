@@ -1,6 +1,6 @@
 
 
-# cython: profile=False 
+# cython: profile=False
 # copile with py3 compiler.py build_ext --inplace
 #changed from https://github.com/pandas-dev/pandas/blob/c1068d9d242c22cb2199156f6fb82eb5759178ae/pandas/_libs/algos.pyx
 
@@ -21,6 +21,9 @@ from numpy cimport (ndarray,
                     uint32_t, uint64_t, float32_t, float64_t,
                     double_t)
 cnp.import_array()
+
+
+
 
 cdef float64_t FP_ERR = 1e-13
 
@@ -62,24 +65,24 @@ def nancorr(ndarray[float32_t, ndim=2] mat):
                       sumx += vx
                       sumy += vy
                       sumxy += vx * vy
-                      sumxx += vx * vx 
+                      sumxx += vx * vx
                       sumyy += vy * vy
-    
+
               sumSq[xi, yi] = sumxx
               sumSq[yi, xi] = sumyy
               sumLin[xi, yi] = sumx
               sumLin[yi, xi] = sumy
               crossN[xi, yi] = sumxy
               crossN[yi, xi] = nobs
-                  
+
 
     return sumLin, sumSq, crossN
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def corr(ndarray[float32_t, ndim=2] sumLin, ndarray[float32_t, ndim=2] sumSq, 
+def corr(ndarray[float32_t, ndim=2] sumLin, ndarray[float32_t, ndim=2] sumSq,
         ndarray[float32_t, ndim=2] crossN):
-    cdef: 
+    cdef:
         int32_t i, j, N, K
         float32_t val
         ndarray[float32_t, ndim=2] results
@@ -94,7 +97,7 @@ def corr(ndarray[float32_t, ndim=2] sumLin, ndarray[float32_t, ndim=2] sumSq,
             d2 = np.sqrt( crossN[j,i] * sumSq[j,i] - sumLin[j,i] * sumLin[j,i])
             if d1 == 0 or d2 == 0:
               val = np.nan
-            else: 
+            else:
               val /= (d1 * d2)
             results[i,j] = results[j,i] = val
         results[i,i] = 0.0 # obv this is 1 but this way testing is easier
@@ -107,12 +110,12 @@ def process_plink_row(row, geno):
         int32_t missing, num_het, num_homo_alt, i
         float32_t item
         ndarray[int32_t, ndim=1] counts
-    counts = np.empty((3), dtype=np.int32)   
+    counts = np.empty((3), dtype=np.int32)
     missing = 0
     num_het = 0
     num_homo_alt = 0
     for i, item in enumerate(row):
-        if item == 3: 
+        if item == 3:
             missing += 1
             geno[i] = np.nan
             continue
@@ -128,19 +131,19 @@ def process_plink_row(row, geno):
 
 
 cdef extern from "plink2_stats.cpp":
-  cpdef double HweP(int32_t obs_hets, int32_t obs_hom1, int32_t ob_hom2, uint32_t midp, uint32_t lower)
+  cpdef double HweP(int32_t obs_hets, int32_t obs_hom1, int32_t ob_hom2, uint32_t midp)
   #cpdef double HweP(ndarray[int32_t, ndim=1] obs_hets, ndarray[int32_t, ndim=1] obs_hom1,
   #    ndarray[int32_t, ndim=1] ob_hom2, uint32_t midp):
-def  hweP(ndarray[int32_t, ndim=2] obs, uint32_t midp, uint32_t lower):
-    cdef: 
+def  hweP(ndarray[int32_t, ndim=2] obs, uint32_t midp):
+    cdef:
         int32_t het, hom1, hom2, i, k
         ndarray[float64_t, ndim=1] results
-    
+
     k,_ = (<object> obs).shape
     results = np.empty((k), dtype=np.float64)
     i = 0
     for hom1, het, hom2 in obs:
-      results[i] = HweP(het, hom1, hom2, midp, lower)
+      results[i] = HweP(het, hom1, hom2, midp)
       i += 1
 
     return results

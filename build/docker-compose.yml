@@ -1,0 +1,34 @@
+version: '3'
+services:
+  app:
+    hostname: hydra
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash
+    environment:
+      - CONFIG_PATH=/app/build/config.yml
+    ports:
+      - "9001:9001"
+    volumes:
+      - "..:/app:rw"
+      - "/scratch"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    tty: true
+    stdin_open: true
+    working_dir: /app
+    networks:
+     hydra-network:
+  redis:
+    image: redis:5.0.4
+    ports:
+      - "9200:9200"
+    networks:
+      hydra-network:
+        aliases:
+          - hydra_redis
+networks:
+  hydra-network:
+    external:
+      name: hydra-network
+

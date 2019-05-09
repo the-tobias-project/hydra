@@ -9,12 +9,10 @@ class Settings(object):
     kSmallEpsilon = 5.684341886080802e-14
     kLargeEpsilon = 1e-07
     SMALL_EPSILON = 5.684341886080802e-14
-    local_scratch = "/local/scratch/armin/Hydra"  # This should be stored in a more ephemeral location
-    #local_scratch = '/vagrant/tmp'
-    python = "/srv/gsfs0/software/python/3.6.4/bin/python3"
-    #python = '/usr/bin/env python3'
+    local_scratch = '/app/scratch'
+    python = 'python'
     plink = "/srv/gsfs0/software/plink/1.90/plink"
-    redis_uri = 'redis://localhost:6379'
+    redis_uri = 'redis://hydra_redis:6379'
 
 
 class Commands(object):
