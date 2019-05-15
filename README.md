@@ -32,6 +32,8 @@ Additionally, if you run `docker ps`from the host machine, you should see two ne
 for HYDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HYDRA (e.g. `hydra_redis_1`).  
 We use Celery to manage client jobs, and Celery uses Redis as its' communication backbone.
 
+To run the experiments on a sample data set, please follow the directions under [data prep](#data-prep-details)
+
 ## Running the server, client(s), and worker(s)
 You will need at least three terminal sessions of some sort for a minimal run on a single machine.  There are many
 strategies for accomplishing this within the same docker session (e.g. tmux, screen, ...), but the recommended method
@@ -79,7 +81,7 @@ C_FORCE_ROOT=1 celery -A worker worker -Q BioME -n BioME --concurrency=1
 Which results in something like this:
 
 ```bash
-root@hydra:/app/src# C_FORCE_ROOT=1 celery -A worker worker -Q BioME -n BioME--concurrency=1
+root@hydra:/app/src# C_FORCE_ROOT=1 celery -A worker worker -Q BioME -n BioME --concurrency=1
 /usr/local/lib/python3.6/site-packages/celery/platforms.py:796: RuntimeWarning: You're running the worker with superuser privileges: this is
 absolutely not recommended!
 
@@ -119,7 +121,7 @@ cd /app/src
 python -m client --name=BioME --plinkfile=/app/testData/popres1 
 ```
 
-You may notice that there are three sets of `popres` files produced from the `build/download1kG.sh`
+You may notice that there are three sets of `popres` files produced from the `testData/download1kG.sh`
 script - here we are somewhat arbitrarily choosing the first.  If you run multiple clients on the same 
 machine, you will need to maintain namespace uniqueness with respect to the `--plinkfile` argument - 
 this is because we use this to name an hdf5 file for the client.  
@@ -157,17 +159,32 @@ curl http://localhost:9001/api/tasks/INIT -X POST
 curl http://localhost:9001/api/tasks/QC -X POST
 curl http://localhost:9001/api/tasks/PCA -X POST
 ```
+1\) Initialization: `curl http://localhost:9001/api/tasks/INIT -X POST`
 
 You will need to monitor the server logs to ensure you don't tell the server to start a task before the
 preceeding task has completed.  For example, once the initialization task has completed, you should see
 a message like the following:
 
 ```bash
-[INFO ] 2019-05-08 23:43:18,311 /app/src/server/lib/task_init.py                                                 :: 41 => storing counts
-[INFO ] 2019-05-08 23:43:18,314 /app/src/server/lib/task_init.py                                                 :: 60 => Done getting init reports from clients
-[INFO ] 2019-05-08 23:43:18,315 /app/src/server/lib/task_init.py                                                 :: 61 => Telling clients to store stats
-[INFO ] 2019-05-08 23:43:18,376 /usr/local/lib/python3.6/site-packages/werkzeug/_internal.py                     :: 122 => 127.0.0.1 - - [08/May/2019 23:43:18] "POST /api/tasks/INIT/COUNT?client_name=BioME HTTP/1.1" 200 -
+[INFO ] [...] :: 41 => storing counts
+[INFO ] [...] :: 60 => Done getting init reports from clients
+[INFO ] [...] :: 61 => Telling clients to store stats
+[INFO ] [...] :: 122 => 127.0.0.1 - - [08/May/2019 23:43:18] "POST /api/tasks/INIT/COUNT?client_name=BioME HTTP/1.1" 200 -
 ```
+
+After which, for each registered client and each chromosome, you should see client responses indicating
+they have finished storing their stats, like so:
+
+```bash
+[INFO ] [...] :: 45 => [BioME]: Finished with init stats for chrom 20
+[INFO ] [...] :: 122 => 172.25.0.1 - - [15/May/2019 22:30:28] "POST /api/clients/BioME/report?status=Finished%20with%20init%20stats%20for%20chrom%2020 HTTP/1.1" 200 -
+[INFO ] [...] :: 45 => [BioME]: Finished with init stats for chrom 21
+[INFO ] [...] :: 122 => 172.25.0.1 - - [15/May/2019 22:30:29] "POST /api/clients/BioME/report?status=Finished%20with%20init%20stats%20for%20chrom%2021 HTTP/1.1" 200 -
+[INFO ] [...] :: 45 => [BioME]: Finished with init stats for chrom 22
+[INFO ] [...] :: 122 => 172.25.0.1 - - [15/May/2019 22:30:30] "POST /api/clients/BioME/report?status=Finished%20with%20init%20stats%20for%20chrom%2022 HTTP/1.1" 200 -
+```
+
+2\) QC: `curl http://localhost:9001/api/tasks/QC -X POST`
 
 For the QC task, with the `popres1` dataset, you should see the following in the logs of the worker:
 
@@ -181,11 +198,13 @@ For the QC task, with the `popres1` dataset, you should see the following in the
 And in the logs of the server:
 
 ```bash
-[INFO ] 2019-05-09 01:22:40,567 /app/src/server/routes/controllers/tasks.py                                      :: 57 => Got task QC/FIN
-[INFO ] 2019-05-09 01:22:40,567 /app/src/server/lib/task_qc.py                                                   :: 120 => Done with filtering in QC stage
-[INFO ] 2019-05-09 01:22:40,567 /app/src/server/routes/controllers/tasks.py                                      :: 70 => We can move on
-[INFO ] 2019-05-09 01:22:40,568 /usr/local/lib/python3.6/site-packages/werkzeug/_internal.py                     :: 122 => 127.0.0.1 - - [09/May/2019 01:22:40] "POST /api/tasks/QC/FIN?client_name=BioME HTTP/1.1" 200 -
+[INFO ] [...] :: 57 => Got task QC/FIN
+[INFO ] [...] :: 120 => Done with filtering in QC stage
+[INFO ] [...] :: 70 => We can move on
+[INFO ] [...] :: 122 => 127.0.0.1 - - [09/May/2019 01:22:40] "POST /api/tasks/QC/FIN?client_name=BioME HTTP/1.1" 200 -
 ```
+
+3\) PCA: `curl http://localhost:9001/api/tasks/PCA -X POST`
 
 After the PCA task has completed, you should see the following in the logs of the worker:
 
@@ -200,12 +219,12 @@ After the PCA task has completed, you should see the following in the logs of th
 And in the logs of the server:
 
 ```bash
-[INFO ] 2019-05-09 01:33:17,120 /app/src/server/routes/controllers/tasks.py                                      :: 57 => Got task PCA/COV
-[INFO ] 2019-05-09 01:33:17,147 /app/src/server/lib/task_pca.py                                                  :: 164 => dealing with 21_21
-[INFO ] 2019-05-09 01:33:17,148 /app/src/server/lib/task_pca.py                                                  :: 177 => 21_21
-[INFO ] 2019-05-09 01:33:17,615 /app/src/server/lib/task_pca.py                                                  :: 184 => 21_21
-[INFO ] 2019-05-09 01:33:17,615 /app/src/server/lib/task_pca.py                                                  :: 186 => Finished storing covariances
-[INFO ] 2019-05-09 01:33:17,636 /usr/local/lib/python3.6/site-packages/werkzeug/_internal.py                     :: 122 => 127.0.0.1 - - [09/May/2019 01:33:17] "POST /api/tasks/PCA/COV?client_name=BioME HTTP/1.1" 200 -
+[INFO ] [...] :: 57 => Got task PCA/COV
+[INFO ] [...] :: 164 => dealing with 21_21
+[INFO ] [...] :: 177 => 21_21
+[INFO ] [...] :: 184 => 21_21
+[INFO ] [...] :: 186 => Finished storing covariances
+[INFO ] [...] :: 122 => 127.0.0.1 - - [09/May/2019 01:33:17] "POST /api/tasks/PCA/COV?client_name=BioME HTTP/1.1" 200 -
 ```
 
 Of course your timestamps are highly unlikely to match up with the ones shown above, but the remaining snp
@@ -221,9 +240,12 @@ server, which will again show up in the server logs.
 ## Data prep details
 
 We will use chromosome 21 and 22 from 1000 Genomes phase 3 for demonstration purposes (n=2504). You
-can find the relevant dataset in `testData/`, or download a copy using `build/download1kG.sh`.  For
+can find the relevant dataset in `testData/`, or download a copy using `testData/download1kG.sh`.  For
 the purposes of this demo, the data has been thinned to contain 100k snps, and the individuals are
-split into 3 separate datasets. 
+split into 3 separate datasets.
+
+Running the `testData/download1kG.sh` script will take approximately 20 minutes to one hour to complete, depending
+on your network connection and your computing power.  You will also need approximately 45 GB of free disk space.
 
 ## Troubleshooting
 
