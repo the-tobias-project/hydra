@@ -55,9 +55,9 @@ plink --bfile subsampled --reference-allele referencelist.txt --keep xab --make-
 plink --bfile subsampled --reference-allele referencelist.txt --keep xac --make-bed --out dset3
 
 split -l 900 merged.dem
-mv xaa dset1.ind
-mv xab dset2.ind
-mv xac dset3.ind
+sed 's/,/\t/g' xaa > dset1.ind
+sed 's/,/\t/g' xab > dset2.ind
+sed 's/,/\t/g' xac > dset3.ind
 
 rm merged.dem
 
