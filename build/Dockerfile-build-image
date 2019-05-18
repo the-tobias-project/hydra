@@ -1,0 +1,45 @@
+FROM python:3.6.8
+
+RUN apt-get update && \
+    apt-get install -y apt-utils && \
+    apt-get install -y build-essential && \
+    apt-get install -y vim && \
+    apt-get install -y man && \
+    apt-get install -y plink1.9 && \
+    ln -s /usr/bin/plink1.9 /usr/bin/plink
+
+WORKDIR /app
+
+RUN mkdir /app/testData
+RUN mkdir /app/build
+RUN mkdir /app/scratch
+
+COPY ./requirements.txt /app/build
+COPY ./download1kG.sh /app/testData
+COPY ./compiler.py /app
+COPY ./corr.pyx /app
+COPY ./corr.cpp /app
+COPY ./plink2_stats.cpp /app
+
+COPY ./dset1.bed /app/testData
+COPY ./dset1.bim /app/testData
+COPY ./dset1.fam /app/testData
+COPY ./dset1.ind /app/testData
+COPY ./dset1.log /app/testData
+COPY ./dset1.nosex /app/testData
+
+COPY ./dset2.bed /app/testData
+COPY ./dset2.bim /app/testData
+COPY ./dset2.fam /app/testData
+COPY ./dset2.ind /app/testData
+COPY ./dset2.log /app/testData
+COPY ./dset2.nosex /app/testData
+
+COPY ./dset3.bed /app/testData
+COPY ./dset3.bim /app/testData
+COPY ./dset3.fam /app/testData
+COPY ./dset3.ind /app/testData
+COPY ./dset3.log /app/testData
+COPY ./dset3.nosex /app/testData
+
+RUN pip install --trusted-host pypi.python.org -r /app/build/requirements.txt

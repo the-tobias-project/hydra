@@ -11,6 +11,22 @@ The recommended setup requires the following:
 * The two ports `[9001, 9200]` open on your computer
 * The Docker network namespaces `[hydra-network, hydra_redis]` available
 
+### Download the image and run a container
+This may be the fastest way, given a good network connection between your machine and
+the docker hub:
+
+1. `docker pull edolfostanford/hydra`
+2. `docker run --name hydra --expose 9001 --hostname hydra -it edolfostanford/hydra bash`
+
+After running this, you should find yourself inside the docker container with a prompt that looks
+like this:
+
+```bash
+root@hydra:/app#
+```
+
+### Build the image yourself
+
 To run the setup, first navigate to this directory, then run the following:
 
 `bash up.sh`
@@ -18,8 +34,8 @@ To run the setup, first navigate to this directory, then run the following:
 (or, if the executable bit is active, `./up.sh`)
 
 This will first build your image to include all necessary libraries and runtime requirements, then run the data prep
-script located in `testData/`.  This script may take on the order of ~10m to complete, depending on your network
-connection and computational resources available.
+script located in `testData/`.  This script may take anywhere between 10 minutes to several hours to complete,
+depending on network connections and computational resources available.
 
 Once the `up.sh` script has completed, you should find yourself inside the docker container with a prompt that looks
 like this:
