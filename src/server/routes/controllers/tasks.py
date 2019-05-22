@@ -40,6 +40,7 @@ def start_task(task_name):
             else:
                 logging.info("Reporting Filtered Sites")
                 task_pca.report_pos()
+                print("Reporting Filtered Sites")
                 logging.info("Reporting Filtered Sites")
                 time.sleep(.5)
                 message_clients("pca/cov")
@@ -96,6 +97,12 @@ def start_subtask(task_name, subtask_name, client_name):
             ass_agg.update(request.data)
         elif subtask_name == "pval":
             ass_agg.update_pval(request.data)
+        elif subtask_name == "hessians":
+            model, have_all_info = ass_agg.newton_stats_update(request.data)
+            if have_all_info:
+                ass_agg.newton_iter(model)
+        elif subtask_name == "valback":
+            ass_agg.collect_likelihoods(request.data)
 
     return HTTPResponse.create_response(200)
 

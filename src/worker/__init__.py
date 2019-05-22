@@ -128,3 +128,9 @@ def adjust_covariates(message, client_config):
 def compute_log_likelihood(message, client_config):
     lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10, client_config)
     lr_agg.send_likelihood(message)
+
+
+@app.task(name='tasks.lineSearch')
+def compute_cost(message, client_config):
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 14), 10, client_config)
+    lr_agg.cost(message)

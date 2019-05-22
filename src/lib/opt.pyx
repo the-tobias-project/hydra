@@ -35,17 +35,19 @@ def minimize_lbfgs(ndarray[float64_t, ndim=2, mode="c"] C not None, ndarray[floa
     cdef:
         long max_iter, m, intN, output
         double[:] dsave, low_bnd, upper_bnd, g, wa
-        long[:] nbd, iwa, isave, csave
+        long[:] iwa, isave, csave
         double f, pgtol, factr
         long task
     intN = (<long> n) 
     max_iter = 5000
-    nbd = np.zeros(n, dtype=np.int64)
+    #nbd = np.zeros(n, dtype=np.int64)
+    cdef long[::1] nbd = np.zeros(n, dtype=np.int64)
     low_bnd = np.zeros(n, dtype=np.float64)
     upper_bnd = np.zeros(n, dtype=np.float64)
     f = 0.0
-    g = np.zeros((n,), np.float64)
-    wa = np.zeros(20*n + 5*n + 1180, np.float64)
+    #g = np.zeros((n,), np.float64)
+    g = np.zeros(n, np.float64)
+    wa = np.zeros(25*n + 1180, np.float64) # m is set to 10
     iwa = np.zeros(3*n ,np.int64)
     csave = np.zeros(60,np.int64)
     #cdef cnp.ndarray array = np.array([False,False,False,False], dtype=bool)
@@ -54,23 +56,16 @@ def minimize_lbfgs(ndarray[float64_t, ndim=2, mode="c"] C not None, ndarray[floa
     #lsave=np.array([False, False, False, False], dtype=bool)
     #lsave = np.zeros(4, np.bool)
     cdef long[:] lsave = np.zeros(4, np.int64)
-    #cdef bint[:] lsave = [False, False, False, False]
-    #bool* lsave = <bool*>&arr_memview8[0]
     isave = np.zeros(44, np.int64)
     dsave = np.zeros(29, np.float64)
-    #task = np.zeros(60,np.int64)
     task = 1 # START
-#    task[0] = np.int64(ord("S"))
-#    task[1] = np.int64(ord("T"))
-#    task[2] = np.int64(ord("A"))
-#    task[3] = np.int64(ord("R"))
-#    task[4] = np.int64(ord("T"))
 
     m = 10
     output = -1
     pgtol = 1e-5
     factr = 1e7
     n_iterations = 0
+    cdef Py_ssize_t i
     
     for n_iterations in range(max_iter):
         setulb(&intN, &m, &x[0],&low_bnd[0], &upper_bnd[0], &nbd[0], &f, &g[0], &factr, &pgtol, &wa[0], &iwa[0], &task,
