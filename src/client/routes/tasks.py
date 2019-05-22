@@ -154,5 +154,17 @@ def compute_likelihoods():
     return HTTPResponse.create_response(200)
 
 
+@bp.route('/asso/query', methods=['POST'])
+def compute_cost():
+    logging.info('Performing line search')
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.lineSearch',
+                            [request.data, app.config['client']],
+                            serializer='pickle',
+                            queue=client_name)
+    return HTTPResponse.create_response(200)
+
+
+
 def adder_fn(a, b):
     return a + b
