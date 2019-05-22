@@ -27,7 +27,7 @@ def start_task(task_name):
     elif task_name.startswith(Commands.QC):
         task_name = "QChwe1e-10"
         filters = task_qc.split_command(task_name)
-        print("Specified Filters :{filters}")
+        logging.info("Specified Filters :{filters}")
         task_qc.start_client_qc_task(filters)
         task_qc.start_local_qc_task(filters)
     elif task_name.startswith(Commands.PCA):
@@ -35,20 +35,23 @@ def start_task(task_name):
             if not task_pca.filtered():
                 task_name = "PCAMAF0.1LD50_0.2"
                 filters = task_qc.split_command(task_name)
-                print(f"Specified pruning filters :{filters}")
+                logging.info(f"Specified pruning filters :{filters}")
                 task_pca.start_pca_filters(filters)
             else:
-                print("Reporting Filtered Sites")
+                logging.info("Reporting Filtered Sites")
                 task_pca.report_pos()
                 print("Reporting Filtered Sites")
+                logging.info("Reporting Filtered Sites")
+                time.sleep(.5)
                 message_clients("pca/cov")
         else:
-            print("starting eigen decomposition")
+            logging.info("starting eigen decomposition")
             task_pca.eigenDecompose(n_components=10)
     elif task_name == Commands.ASSO:
-        print("Starting Associations")
+        logging.info("Starting Associations")
         # setup
         ass_agg = task_ass.LogisticAdmm.get_instance(npcs=10, active=2)
+    return HTTPResponse.create_response(200, f'Started task {task_name}')
 
 
 def start_subtask(task_name, subtask_name, client_name):
@@ -65,13 +68,13 @@ def start_subtask(task_name, subtask_name, client_name):
     elif task_name.startswith(Commands.QC):
         if subtask_name == "FIN":
             if task_qc.filter_finished(client_name, Commands.QC):
-                print("We can move on")
+                logging.info("We can move on")
 
     elif task_name.startswith(Commands.PCA):
         #pdb.set_trace()
         if subtask_name == "FIN":
             if task_qc.filter_finished(client_name, Commands.PCA):
-                print("Done with PCA filters")
+                logging.info("Done with PCA filters")
                 reset_states("PRUNE")
                 ld_agg = task_pca.CovarianceAggregator.get_instance(len(Registry.get_instance().list_clients()), 50)
                 # send message to start LD pruning 

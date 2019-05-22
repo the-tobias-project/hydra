@@ -17,10 +17,10 @@ from lib.client_registry import Registry
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
-clients = Registry.get_instance().list_clients()
 
 
 def start_init_task():
+    clients = Registry.get_instance().list_clients()
     for client in clients:
         Registry.get_instance().set_client_state(client['name'], Commands.INIT)
         requests.post(f'http://{client["external_host"]}:{client["port"]}/api/init')
@@ -65,6 +65,7 @@ def store_counts(data, client_name):
 def count_stats():
     N = float(store.attrs["N"])
     task = "INIT"
+    clients = Registry.get_instance().list_clients()
     for chrom in store.keys():
         counts_dset = store["{}/counts".format(chrom)].value
         missing_rate = counts_dset[:, 3] / float(N)
