@@ -11,6 +11,22 @@ The recommended setup requires the following:
 * The two ports `[9001, 9200]` open on your computer
 * The Docker network namespaces `[hydra-network, hydra_redis]` available
 
+### Download the image and run a container
+This may be the fastest way, given a good network connection between your machine and
+the docker hub:
+
+1. `docker pull edolfostanford/hydra`
+2. `docker run --name hydra --expose 9001 --hostname hydra -it edolfostanford/hydra bash`
+
+After running this, you should find yourself inside the docker container with a prompt that looks
+like this:
+
+```bash
+root@hydra:/app#
+```
+
+### Build the image yourself
+
 To run the setup, first navigate to this directory, then run the following:
 
 `bash up.sh`
@@ -18,8 +34,8 @@ To run the setup, first navigate to this directory, then run the following:
 (or, if the executable bit is active, `./up.sh`)
 
 This will first build your image to include all necessary libraries and runtime requirements, then run the data prep
-script located in `testData/`.  This script may take on the order of ~10m to complete, depending on your network
-connection and computational resources available.
+script located in `testData/`.  This script may take anywhere between 10 minutes to several hours to complete,
+depending on network connections and computational resources available.
 
 Once the `up.sh` script has completed, you should find yourself inside the docker container with a prompt that looks
 like this:
@@ -66,12 +82,16 @@ root@hydra:/app/src# python -m server
 
 From here you can explore the API on a web browser on the same machine by visiting `http://localhost:9001/api/ui/`
 
+The server invoked without any arguments assumes the default configuration inside [`src/lib/settings.py`](src/lib/settings.py).
+You can override the defaults by either modifying that file directly, or adding arguments to the command line invocation.
+Details can be accessed by calling `python -m server --help`.
+
 #### Running the worker
 Prerequisites: None
 
 The worker needs to be associated with the client it's serving - this is done by giving both the same
 name.  Here we assume the name is `BioME`, which is within the list of clients inside 
-`src/lib/settings.py::ClientHTTP`.  Any modifications should be reflected within that class.
+[`src/lib/settings.py::ClientHTTP`](src/lib/settings.py).  Any modifications should be reflected within that class.
 
 ```bash
 cd /app/src
@@ -118,10 +138,13 @@ Starting the client also requires some configuration - again we are assuming the
 
 ```bash
 cd /app/src
-python -m client --name=BioME --plinkfile=/app/testData/popres1 
+python -m client --name=BioME --plinkfile=/app/testData/dset1 
 ```
 
-You may notice that there are three sets of `popres` files produced from the `testData/download1kG.sh`
+This barebones call assumes the defaults inside [`src/lib/settings.py`](src/lib/settings.py), which can be overwritten
+either in the file itself, or on the command-line invocation.  Call `python -m client --help` for details.
+
+You may notice that there are three sets of `dset` files produced from the `testData/download1kG.sh`
 script - here we are somewhat arbitrarily choosing the first.  If you run multiple clients on the same 
 machine, you will need to maintain namespace uniqueness with respect to the `--plinkfile` argument - 
 this is because we use this to name an hdf5 file for the client.  
@@ -186,12 +209,17 @@ they have finished storing their stats, like so:
 
 2\) QC: `curl http://localhost:9001/api/tasks/QC -X POST`
 
-For the QC task, with the `popres1` dataset, you should see the following in the logs of the worker:
+For the QC task, with the `dset1` dataset, you should see the following in the logs of the worker:
 
 ```bash
+After filtering 20, 67886 snps remain
+After filtering 21, 41111 snps remain
+After filtering 22, 40898 snps remain
+
 [2019-05-09 01:22:40,433: WARNING/ForkPoolWorker-1] Pefroming QC
-[2019-05-09 01:22:40,448: WARNING/ForkPoolWorker-1] After filtering 20, 11333 snps remain
-[2019-05-09 01:22:40,509: WARNING/ForkPoolWorker-1] After filtering 21, 6465 snps remain
+[2019-05-09 01:22:40,448: WARNING/ForkPoolWorker-1] After filtering 20, 67886 snps remain
+[2019-05-09 01:22:40,509: WARNING/ForkPoolWorker-1] After filtering 21, 41111 snps remain
+[2019-05-09 01:22:40,539: WARNING/ForkPoolWorker-1] After filtering 22, 40898 snps remain
 [2019-05-09 01:22:40,568: WARNING/ForkPoolWorker-1] Finished reporting counts
 ```
 
@@ -209,11 +237,14 @@ And in the logs of the server:
 After the PCA task has completed, you should see the following in the logs of the worker:
 
 ```bash
-[2019-05-09 01:33:03,069: WARNING/ForkPoolWorker-1] Done with LD pruning
-[2019-05-09 01:33:06,726: WARNING/ForkPoolWorker-1] Reporting cov: 20_20: (7542, 800) x (800, 7542)
-[2019-05-09 01:33:13,806: WARNING/ForkPoolWorker-1] Reporting cov: 21_20: (4369, 800) x (800, 7542)
-[2019-05-09 01:33:16,613: WARNING/ForkPoolWorker-1] Reporting cov: 21_21: (4369, 800) x (800, 4369)
-[2019-05-09 01:33:17,637: WARNING/ForkPoolWorker-1] Final size will be 11911
+[2019-05-15 22:38:31,563: WARNING/ForkPoolWorker-1] Done with LD pruning
+[2019-05-15 22:38:36,123: WARNING/ForkPoolWorker-1] Reporting cov: 20_20: (4277, 900) x (900, 4277)
+[2019-05-15 22:39:26,014: WARNING/ForkPoolWorker-1] Reporting cov: 21_20: (2806, 900) x (900, 4277)
+[2019-05-15 22:39:58,969: WARNING/ForkPoolWorker-1] Reporting cov: 21_21: (2806, 900) x (900, 2806)
+[2019-05-15 22:40:25,431: WARNING/ForkPoolWorker-1] Reporting cov: 22_20: (2738, 900) x (900, 4277)
+[2019-05-15 22:40:59,882: WARNING/ForkPoolWorker-1] Reporting cov: 22_21: (2738, 900) x (900, 2806)
+[2019-05-15 22:41:31,605: WARNING/ForkPoolWorker-1] Reporting cov: 22_22: (2738, 900) x (900, 2738)
+[2019-05-15 22:41:54,846: WARNING/ForkPoolWorker-1] Final size will be 9821
 ```
 
 And in the logs of the server:
@@ -227,10 +258,7 @@ And in the logs of the server:
 [INFO ] [...] :: 122 => 127.0.0.1 - - [09/May/2019 01:33:17] "POST /api/tasks/PCA/COV?client_name=BioME HTTP/1.1" 200 -
 ```
 
-Of course your timestamps are highly unlikely to match up with the ones shown above, but the remaining snp
-counts for each chromosome should be exact matches.
-
-Please note the server location and port number are set inside `src/lib/settings.py :: ServerHTTP`.
+The remaining snp counts for each chromosome should be exact matches.
 
 As the clients perform their tasks, they may send further subtasks to the server - these 
 will show up in the server logs, along with the name of the client that sent the task.
@@ -239,7 +267,7 @@ server, which will again show up in the server logs.
 
 ## Data prep details
 
-We will use chromosome 21 and 22 from 1000 Genomes phase 3 for demonstration purposes (n=2504). You
+We will use chromosome 20, 21, and 22 from 1000 Genomes phase 3 for demonstration purposes (n=2504). You
 can find the relevant dataset in `testData/`, or download a copy using `testData/download1kG.sh`.  For
 the purposes of this demo, the data has been thinned to contain 100k snps, and the individuals are
 split into 3 separate datasets.

@@ -22,7 +22,3 @@ ADD ./corr.cpp /app
 ADD ./plink2_stats.cpp /app
 
 RUN pip install --trusted-host pypi.python.org -r /app/build/requirements.txt
-
-RUN cd /app/testData && \
-    chmod +x download1kG.sh && \
-    ./download1kG.sh
