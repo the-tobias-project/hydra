@@ -4,7 +4,7 @@ import pdb
 import time
 
 # third party lib
-from flask import request
+from flask import current_app, request
 import requests
 
 # internal lib
@@ -118,9 +118,9 @@ def message_clients(address, client_name=None):
     if client_name is None:
         client_list = clients
     else:
-        client_list = list(filter(lambda x: x["name"]==client_name, clients))
+        client_list = list(filter(lambda x: x["name"] == client_name, clients))
     for client in client_list:
-        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/{address}')
-
-
-
+        if current_app.config['ENV'] == 'development':
+            requests.post(f'http://{client["external_host"]}:{client["port"]}/api/{address}')
+        else:
+            requests.post(f'https://{client["external_host"]}:{client["port"]}/api/{address}')
