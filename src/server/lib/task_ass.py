@@ -37,7 +37,7 @@ class LogisticAdmm(object):
             self.estimates = {}
             self.iters, self.accumulant = {}, {}
             self.chroms = [v for v in store.keys() if v != 'meta']
-            self.chroms = ["21"] #TODO change this
+            #self.chroms = ["21"]
             self.active_chroms = ["Small"]
             self.finished = {}
             self.likelihood = {}
@@ -68,7 +68,6 @@ class LogisticAdmm(object):
         if self.algo != "admm":
             L = store[f"{chrom}/positions"].shape[0]
             starter = self.estimates["Small"]
-            pdb.set_trace()
             warm_start = np.empty((starter.shape[0]+1, 1))
             warm_start[1] = 0
             warm_start[0] = starter[0]
@@ -85,7 +84,7 @@ class LogisticAdmm(object):
         return LogisticAdmm.__instance
 
     def update_stats(self, data):
-        #TODO this should just be it's own object but for now it's faster to just add it here
+        #TODO this should just be its own object but for now it's faster to just add it here
         logging.info(f"Constructing feature's matrix!")
         data = pickle.loads(data)
         if self.normalization_stats is None:
@@ -129,8 +128,8 @@ class LogisticAdmm(object):
 
     def update(self, message):
         message = pickle.loads(message)
-        if "H" in message: 
-            pdb.set_trace()
+        #if "H" in message: 
+        #    pdb.set_trace()
         z_hat = message["VALS"]
         model = message["Estimated"]
         logging.info(f"Updating Estimate from {model}")
@@ -286,7 +285,6 @@ class LogisticAdmm(object):
             write_or_replace(store, f"meta/{model}/newton_coef", self.estimates[model])
             af = store[f"{model}/allele_freq"].value
             arr = np.logical_not(np.logical_or(af < self.threshold, 1-af < self.threshold))
-            pdb.set_trace()
             est = self.estimates[model][arr]
             msg = {"Estimated": model, "conv": np.expand_dims(arr, axis=1), "x0": est[:,:,0]}
             self.send_request(msg, "query")
@@ -298,7 +296,7 @@ class LogisticAdmm(object):
                 #COMPUTE PVALS
             else:
                 chrom = self.chroms.pop()
-                self.activate_chroms.append(chrom)
+                self.active_chroms.append(chrom)
                 self.make_chrom_active(chrom)
             return
         else:
@@ -379,7 +377,7 @@ class LogisticAdmm(object):
 
     def initialize_pval_computation(self):
         self.chroms = set([v for v in store.keys() if v != 'meta'])
-        self.chroms = ["21"] #TODO change this
+        #self.chroms = ["21", "22"]
         self.send_coef("Small", {})
 
     def send_coef(self, model, msg):
