@@ -19,7 +19,25 @@ app = Flask(__name__)
 
 server_host = settings.ServerHTTP.external_host
 server_port = settings.ServerHTTP.port
-BASE_URL = f'http://{server_host}:{server_port}/api'
+
+
+class BaseURL(object):
+    __instance = None
+
+    @staticmethod
+    def get_instance(is_dev_env):
+        if BaseURL.__instance is None:
+            BaseURL(is_dev_env)
+        return BaseURL.__instance
+
+    def __init__(self, is_dev_env):
+        if BaseURL.__instance is not None:
+            return  # Short circuit instantiation
+        if is_dev_env:
+            self.url = f'http://{server_host}:{server_port}/api'
+        else:
+            self.url = f'https://{server_host}:{server_port}/api'
+        BaseURL.__instance = self
 
 
 def parse_args():
@@ -49,6 +67,8 @@ def parse_args():
     parser.add_argument('--listen_host', type=str, help='[OPTIONAL] Override the default host on which this client'
                                                         'should listen.  Defaults to '
                                                         f'{settings.ClientHTTP.default_listen_host}')
+    parser.add_argument('--dev', type=bool, default=False, help='[OPTIONAL] Specify a development environment.  '
+                                                                'WARNING: this will bypass security checks.')
 
     return parser.parse_args()
 
@@ -76,8 +96,8 @@ def configure_client(client, args):
     return client
 
 
-def register_self(client):
-    url = f'{BASE_URL}/clients'
+def register_self(client, server_url):
+    url = f'{server_url}/clients'
     try:
         registered_clients = requests.get(url).json()
         self_name = client['name']
@@ -102,8 +122,9 @@ def register_self(client):
 def teardown(signum, frame):
     try:
         client = app.config['client']
-        url = f'{BASE_URL}/clients'
-        requests.delete(f'{url}/{client["name"]}')
+        base_url = BaseURL.get_instance(None).url  # Should always be initialised when we get here; passing None is OK
+        url = f'{base_url}/clients/{client["name"]}'
+        requests.delete(url)
         sys.exit(0)
     except Exception as e:
         logging.error('Ran into unexpected error during teardown')
@@ -133,7 +154,8 @@ def main():
 
     app.register_blueprint(tasks.bp)
 
-    if not register_self(client):
+    server_url = BaseURL.get_instance(args.dev).url
+    if not register_self(client, server_url):
         logging.error('Could not register self with server, exiting...')
         sys.exit(1)
 
