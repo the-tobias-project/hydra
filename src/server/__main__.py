@@ -12,7 +12,7 @@ from flask import current_app
 # Internal lib
 from lib import settings
 
-options = {"swagger_ui": True}  # to activate: pip3 install connexion[swagger-ui]
+options = {"swagger_ui": True}
 app = connexion.FlaskApp(__name__, options=options)
 BASE_SCHEMA = 'base.yml'
 
@@ -30,6 +30,8 @@ def parse_args():
                                                         f'{settings.ServerHTTP.listen_host}')
     parser.add_argument('--scratch', type=str, help='[OPTIONAL] Override the default scratch location on disk.'
                                                     f'Defaults to {settings.Settings.local_scratch}')
+    parser.add_argument('--dev', type=bool, default=False, help='[OPTIONAL] Specify a development environment.  '
+                                                                'WARNING: this will bypass security checks.')
     return parser.parse_args()
 
 
@@ -94,9 +96,10 @@ def main():
 
     app.app.config['MAX_CONTENT_LENGTH'] = server['max_content_length']
     app.app.config['server'] = server  # Store configuration for later use
+    if args.dev:
+        app.app.config['ENV'] = 'development'
 
     app.run(host=server['listen_host'], port=server['port'], threaded=False)
-    #app.run(host=server['listen_host'], port=server['port'])
 
 
 if __name__ == '__main__':
