@@ -12,7 +12,7 @@ from sklearn.metrics import log_loss
 
 # internal lib
 from client.lib import shared
-from lib import HTTPResponse
+from lib import networking
 from lib.utils import write_or_replace
 from lib.optimizationAux import *
 from lib.opt import minimize_lbfgs
@@ -92,8 +92,8 @@ class LogisticAdmm(object):
             #,"data": self.covariates, "ys": self.Ys  #TODO take this out. only for debugging
             }
         msg = pickle.dumps(msg)
-        HTTPResponse.respond_to_server('api/tasks/ASSO/adjust', 'POST', msg,
-            self.client_config['name'])
+        networking.respond_to_server('api/tasks/ASSO/adjust', 'POST', msg,
+                                     self.client_config['name'])
 
     def global_standardize(self, data, client_config):
         data = pickle.loads(data)
@@ -157,8 +157,8 @@ class LogisticAdmm(object):
         self.previous_Us[model] = all_Us
         est = z_hat+all_Us
         msg = pickle.dumps({"VALS": est, "Estimated":"Small"})
-        HTTPResponse.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
-            self.client_config['name'])
+        networking.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
+                                     self.client_config['name'])
 
     def run_newton_lr(self, y, chrom=None, warm_start=None, unconverged=None):
         store = self.store
@@ -216,8 +216,8 @@ class LogisticAdmm(object):
         vals -= baselikelihood
         msg = pickle.dumps({"Estimated": chrom, "H": hessians, 'g':gradients,
           'd': diagonals, 'v': vals, "covar": covariates})
-        HTTPResponse.respond_to_server('api/tasks/ASSO/hessians', 'POST', msg,
-            self.client_config['name'])
+        networking.respond_to_server('api/tasks/ASSO/hessians', 'POST', msg,
+                                     self.client_config['name'])
 
     def cost(self, data):
         msg = pickle.loads(data)
@@ -227,8 +227,8 @@ class LogisticAdmm(object):
         estimates = self.evaluate_estimate(chrom, mask, x0)
         estimates -= self.baseline_likelihood[chrom][mask[:,0]]
         msg = pickle.dumps({'estimated': chrom, 'v': estimates})
-        HTTPResponse.respond_to_server('api/tasks/ASSO/valback', 'POST', msg,
-            self.client_config['name'])
+        networking.respond_to_server('api/tasks/ASSO/valback', 'POST', msg,
+                                     self.client_config['name'])
 
     def evaluate_estimate(self, chrom, mask, x0, exclude=None):
         store = self.store
@@ -339,8 +339,8 @@ class LogisticAdmm(object):
         self.previous_estimates[chrom] = estimates
         self.previous_Us[chrom] = all_Us 
         msg = pickle.dumps({"Estimated": chrom, "VALS": z_hat + all_Us})#, 'cov': covariates})
-        HTTPResponse.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
-            self.client_config['name'])
+        networking.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
+                                     self.client_config['name'])
 
 
     def send_likelihood(self, message):
@@ -383,5 +383,5 @@ class LogisticAdmm(object):
                     ell[0,i] -= log_loss(y[ind], self.base_y_pred[ind], normalize=False, labels=[0,1])
 
         msg = pickle.dumps({"Estimated": model, "estimate": ell})
-        HTTPResponse.respond_to_server('api/tasks/ASSO/pval', 'POST', msg,
-            self.client_config['name'])
+        networking.respond_to_server('api/tasks/ASSO/pval', 'POST', msg,
+                                     self.client_config['name'])

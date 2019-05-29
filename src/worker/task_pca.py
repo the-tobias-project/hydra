@@ -11,7 +11,7 @@ from sklearn.utils.extmath import svd_flip
 
 # internal lib
 from client.lib import shared
-from lib import HTTPResponse
+from lib import networking
 from lib.utils import write_or_replace
 from lib.corr import nancorr, process_plink_row
 
@@ -57,8 +57,8 @@ class LdReporter(object):
             if state[0] == "E": # Finished with this chrom
                 if len(data) == 1: # Done with everything
                     msg = pickle.dumps({})
-                    HTTPResponse.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
-                        client_config['name'])
+                    networking.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
+                                                 client_config['name'])
                     print("Done with LD pruning")
                     return
                 continue
@@ -74,7 +74,7 @@ class LdReporter(object):
             corr = nancorr(genotypes)
             msg[chrom] = corr
         msg = pickle.dumps(msg)
-        HTTPResponse.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'])
+        networking.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'])
         self.r3 += self.r2
         print(self.r3)
 
@@ -140,7 +140,7 @@ def report_cov(client_config):
                     msg["E"] = True
                 msg = pickle.dumps(msg)
                 #time.sleep(1)
-                HTTPResponse.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'])
+                networking.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'])
         print(f"Final size will be {size}")
 
 

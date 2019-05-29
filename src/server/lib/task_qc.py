@@ -51,7 +51,7 @@ def start_client_qc_task(filters, stage=Commands.QC):
         requests.post(f'http://{client["external_host"]}:{client["port"]}/api/qc', data=data)
 
 
-def start_local_qc_task(filters, prefix=None): #Filter based on local info
+def start_local_qc_task(filters, prefix=None):  # Filter based on local info
     """Performs the filters with threshold values specified in a dictionary
     named filters. This deletes the snps if prefix is left as None"""
     for chrom in store.keys():
@@ -113,6 +113,7 @@ def start_local_qc_task(filters, prefix=None): #Filter based on local info
             d3 = group.require_dataset(prefix + "allele_freq"
                 , af_vals.shape, dtype=af_vals.dtype)
             d3[:] = af_vals
+
 
 def filter_finished(client_name, state):
     Registry.get_instance().set_client_state(client_name, "Filterd")

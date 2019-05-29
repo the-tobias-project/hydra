@@ -1,10 +1,7 @@
 # stdlib
 import logging
 import pickle
-import re
 import os
-import pdb
-import time
 
 # third party lib
 import requests
@@ -13,7 +10,7 @@ import numpy as np
 from scipy.sparse.linalg import eigsh as eig
 
 # internal lib
-from lib.settings import Settings, Options, PCAFilterNames, Commands
+from lib.settings import Settings, PCAFilterNames, Commands
 from lib.client_registry import Registry
 from . import task_qc
 from lib.corr import corr
@@ -36,24 +33,27 @@ def ready_to_decompose():
                 return False
     return True
 
+
 def filtered():
     chrom = [key for key in store if key != "meta"][0]
     if "PCA_passed" in store[chrom] :
         return True
     return False
 
+
 def start_pca_filters(filters):
-   logging.info("Initiating PCA filters...")
-   qc_subset_filters = {key: value for key,value in filters.items()
-      if key != PCAFilterNames.PCA_LD}
-   if qc_subset_filters: # Perform the qc like filters
-      task_qc.start_local_qc_task(qc_subset_filters, prefix="PCA_")
-      filters["remove"] = False
-      task_qc.start_client_qc_task(filters, stage=Commands.PCA)
+    logging.info("Initiating PCA filters...")
+    qc_subset_filters = {key: value for key, value in filters.items()
+                         if key != PCAFilterNames.PCA_LD}
+    if qc_subset_filters:  # Perform the qc like filters
+        task_qc.start_local_qc_task(qc_subset_filters, prefix="PCA_")
+        filters["remove"] = False
+        task_qc.start_client_qc_task(filters, stage=Commands.PCA)
 
 
 class CovarianceAggregator(object):
     __instance = None
+
     def __init__(self, num_clients, win_size=50, thresh=0.2):
         if CovarianceAggregator.__instance is not None:
             return
@@ -73,31 +73,35 @@ class CovarianceAggregator(object):
             CovarianceAggregator(num_clients, win_size)
         return CovarianceAggregator.__instance
     
-    def send_request(self, data):
+    def send_request(self, data, params=None):
         to_send = pickle.dumps(data)
-        for client in clients: 
-            requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/ld',
-                data=to_send)
+        for client in clients:
+            if not params:
+                requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/ld',
+                              data=to_send)
+            else:
+                requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/ld',
+                              data=to_send, params=params)
 
-    def update(self,message):
+    def update(self, message):
         msg = pickle.loads(message)
         del message
         for key, val in msg.items():
-           if key in self.sumLin:
-               self.sumLin[key] += val[0]
-               self.sumSq[key]  += val[1]
-               self.cross[key]  += val[2]
-           else:
-               self.sumLin[key] = val[0]
-               self.sumSq[key]  = val[1]
-               self.cross[key]  = val[2]
+            if key in self.sumLin:
+                self.sumLin[key] += val[0]
+                self.sumSq[key] += val[1]
+                self.cross[key] += val[2]
+            else:
+                self.sumLin[key] = val[0]
+                self.sumSq[key] = val[1]
+                self.cross[key] = val[2]
         self.counter += 1
         if self.counter == self.num_clients: # Everyone reported
             message = {}
             for key, val in msg.items():
                 corr_tot = corr(self.sumLin[key], self.sumSq[key],
-                    self.cross[key])
-                group  = store[key]
+                                self.cross[key])
+                group = store[key]
                 tokeep = store["{}/PCA_passed".format(key)].value
                 #positions = self.store["{}/PCA_positions".format(key)].value
                 end = min(self.r1 + self.r0, len(tokeep))
@@ -110,16 +114,16 @@ class CovarianceAggregator(object):
                 while True:
                     #length_of_window = np.sum(tokeep[self.r0:end)
                     for i, snp1 in enumerate(unfiltered):
-                        if not snp1: # already filtered
+                        if not snp1:  # already filtered
                             continue
                         else:
-                            for j in range(i+1,n):
+                            for j in range(i+1, n):
                                 snp2 = unfiltered[j]
                                 if not snp2: # if it didn't pass the filters
                                     continue
                                 elif corr_tot[i,j] ** 2 > self.thresh:
-                                    if maf[i] > (maf[j] * (1.0 + 
-                                        Settings.kSmallEpsilon)):
+                                    if maf[i] > (maf[j] * (1.0 +
+                                                           Settings.kSmallEpsilon)):
                                         unfiltered[i] = False
                                     else:
                                         unfiltered[j] = False
@@ -140,6 +144,7 @@ class CovarianceAggregator(object):
             self.r0 += self.r2
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
 #            self.tqdm.update(self.r2)
+
 
 def report_pos(client_names=None):
     if client_names is None:
@@ -211,7 +216,7 @@ def eigenDecompose(n_components=10):
                     j_old += pcov.shape[1]
             i_old += pcov.shape[0]
         cov /= (cov.shape[0])
-        sigma, v = eig(cov, k=n_components, ncv=3*n_components)#, maxiter=20*cov.shape[0])
+        sigma, v = eig(cov, k=n_components, ncv=3*n_components)  # , maxiter=20*cov.shape[0])
         sigma, v = zip(*sorted(zip(sigma, v.T), reverse=True))
         v = np.array(v)
         sigma = np.array(sigma)
@@ -231,6 +236,6 @@ def eigenDecompose(n_components=10):
     msg = pickle.dumps(msg)
     for client in clients:
         requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/eig',
-            data=msg)
+                      data=msg)
 
 
