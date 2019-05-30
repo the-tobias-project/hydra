@@ -18,7 +18,7 @@ from lib.settings import Settings, Options, PCAFilterNames, Commands
 from lib.client_registry import Registry
 from lib.utils import write_or_replace
 
-from  sklearn.linear_model import LogisticRegression as lr
+#from  sklearn.linear_model import LogisticRegression as lr
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
