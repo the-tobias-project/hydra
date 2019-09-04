@@ -13,6 +13,7 @@ WORKDIR /app
 RUN mkdir /app/testData
 RUN mkdir /app/build
 RUN mkdir /app/scratch
+RUN mdkir /app/src
 
 COPY ./requirements.txt /app/build
 COPY ./download1kG.sh /app/testData
@@ -20,6 +21,7 @@ COPY ./compiler.py /app
 COPY ./corr.pyx /app
 COPY ./corr.cpp /app
 COPY ./plink2_stats.cpp /app
+COPY ./src/* /app/src/*
 
 COPY ./dset1.bed /app/testData
 COPY ./dset1.bim /app/testData

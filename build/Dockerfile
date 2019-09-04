@@ -13,8 +13,10 @@ WORKDIR /app
 RUN mkdir /app/testData
 RUN mkdir /app/build
 RUN mkdir /app/scratch
+RUN mkdir /app/src
 
 ADD ./requirements.txt /app/build
+ADD ./src/ /app/src
 ADD ./download1kG.sh /app/testData
 ADD ./compiler.py /app
 ADD ./corr.pyx /app
