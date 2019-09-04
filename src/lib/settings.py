@@ -85,6 +85,7 @@ class ServerHTTP(object):
     external_host = 'localhost'
     port = '9001'
     max_content_length = 1024 * 1024 * 1024  # 1 GB
+    wait_time = 0.5  # for the time.sleep() hacks
 
 
 class ClientHTTP(object):

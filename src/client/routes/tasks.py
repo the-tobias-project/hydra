@@ -7,7 +7,7 @@ from flask import current_app as app
 from celery import Celery
 
 # Internal lib
-from lib import HTTPResponse
+from lib import networking
 from lib.settings import Settings
 
 bp = Blueprint('root', __name__, url_prefix='/api')
@@ -22,7 +22,7 @@ def init():
                             [app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/init/stats', methods=['POST'])
@@ -33,7 +33,7 @@ def init_stats():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/delayed', methods=['GET'])
@@ -44,7 +44,7 @@ def delayed():
                                       serializer='pickle',
                                       queue=client_name)
     # resolution = promise.wait()  # answer is in here, if the celery backend is defined.  This will block.
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/after_delayed', methods=['GET'])
@@ -52,7 +52,7 @@ def after_delayed():
     logging.info('called after_delayed celery entry point')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.dependent', None, serializer='pickle', queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/qc', methods=['POST'])
@@ -63,7 +63,7 @@ def qc():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/pca/ld', methods=['POST'])
@@ -74,7 +74,7 @@ def ld_report():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/pca/pcapos', methods=['POST'])
@@ -85,7 +85,7 @@ def store_filtered():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/pca/cov', methods=['POST'])
@@ -96,7 +96,7 @@ def communicate_cov():
                             [app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/pca/eig', methods=['POST'])
@@ -107,7 +107,7 @@ def pca_projection():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/asso/adjust', methods=['POST'])
@@ -118,7 +118,7 @@ def data_adjust():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/asso/initialize', methods=['POST'])
@@ -129,7 +129,7 @@ def lr_init():
                             [app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/asso/estimate', methods=['POST'])
@@ -140,7 +140,7 @@ def lr_association():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/asso/coef', methods=['POST'])
@@ -151,7 +151,7 @@ def compute_likelihoods():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 @bp.route('/asso/query', methods=['POST'])
@@ -162,7 +162,7 @@ def compute_cost():
                             [request.data, app.config['client']],
                             serializer='pickle',
                             queue=client_name)
-    return HTTPResponse.create_response(200)
+    return networking.create_response(200)
 
 
 

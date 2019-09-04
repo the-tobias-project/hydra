@@ -14,7 +14,7 @@ from plinkio import plinkfile
 
 # internal lib
 from client.lib import shared
-from lib import HTTPResponse
+from lib import networking
 from lib.utils import write_or_replace
 from lib.corr import nancorr, process_plink_row
 from lib.settings import QCFilterNames, Settings
@@ -94,8 +94,8 @@ def run_QC(filters, client_config, remove=True):
                     group.create_dataset("PCA_positions", data=positions)
     client_name = client_config['name']
     if remove:
-        HTTPResponse.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name)
+        networking.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name)
     else:
-        HTTPResponse.respond_to_server('api/tasks/PCA/FIN', "POST", b'', client_name)
+        networking.respond_to_server('api/tasks/PCA/FIN', "POST", b'', client_name)
 
 
