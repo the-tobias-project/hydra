@@ -14,7 +14,7 @@ from plinkio import plinkfile
 
 # internal lib
 from client.lib import shared
-from lib import HTTPResponse
+from lib import networking
 from lib.utils import write_or_replace
 from lib.corr import nancorr, process_plink_row
 
@@ -145,14 +145,14 @@ def send_positions_to_server(positions, chrom, client_config):
         'POS': positions
     })
 
-    HTTPResponse.respond_to_server('api/tasks/INIT/POS', 'POST', data, client_name)
+    networking.respond_to_server('api/tasks/INIT/POS', 'POST', data, client_name)
 
 
 def send_counts_to_server(data, client_config):
     print('sending counts to server')
     client_name = client_config['name']
     data = pickle.dumps(data)
-    HTTPResponse.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name)
+    networking.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name)
     print('sent counts to server')
 
 
@@ -196,4 +196,4 @@ def init_stats(message, client_config):
 
     client_name = client_config['name']
     status = f'Finished with init stats for chrom {chrom}'
-    HTTPResponse.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST')
+    networking.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST')

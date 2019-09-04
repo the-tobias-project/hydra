@@ -128,11 +128,11 @@ paths:
           in: query
           type: string
           required: true
-        - name: subtask_params
+        - name: p_name
           in: query
           type: string
           required: false
-          description: key-value pairs of any parameters needed to pass into the given subtask
+          description: Key-value pairs of any parameters needed to pass into the given subtask.  Keys must begin with `p_`, e.g. `/tasks/A/B?p_threshold=1%26p_sensitivity=.5`.  Note we have url-encoded the ampersand.
       responses:
         200:
           description: Successfully started subtask
