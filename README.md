@@ -50,6 +50,21 @@ We use Celery to manage client jobs, and Celery uses Redis as its' communication
 
 To run the experiments on a sample data set, please follow the directions under [data prep](#data-prep-details)
 
+## Downloading test data: 
+
+In this step we download chromosomes 20-22 from 1KG project and split the data (by individuals) between three separate silos. This is for demonstration purposes. 
+
+Once the container is running execute the download command from within it: 
+
+```bash
+docker exec -it hydra_app_1 "download1kG.sh"
+```
+
+Downloading and splitting the data is slow and may take ~ 30 mins.
+
+You can use your own data by simply splitting the plink files and placing them in the corresponding data folders. 
+
+
 ## Running the server, client(s), and worker(s)
 You will need at least three terminal sessions of some sort for a minimal run on a single machine.  There are many
 strategies for accomplishing this within the same docker session (e.g. tmux, screen, ...), but the recommended method

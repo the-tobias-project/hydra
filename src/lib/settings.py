@@ -93,61 +93,25 @@ class ClientHTTP(object):
     default_listen_host = '0.0.0.0'
     default_external_host = 'localhost'
     clients = [{
-            'name': 'BioME',
+            'name': 'Center1',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9002,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'MEC_CA',
+            'name': 'Center2',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9003,
             'max_content_length': default_max_content_length
         },
         {
-            'name': 'MEC_HI',
+            'name': 'Center3',
             'listen_host': default_listen_host,
             'external_host': default_external_host,
             'port': 9004,
             'max_content_length': default_max_content_length
-        },
-        {
-            'name': 'SOL_B',
-            'listen_host': default_listen_host,
-            'external_host': default_external_host,
-            'port': 9005,
-            'max_content_length': default_max_content_length
-        },
-        {
-            'name': 'SOL_C',
-            'listen_host': default_listen_host,
-            'external_host': default_external_host,
-            'port': 9006,
-            'max_content_length': default_max_content_length
-        },
-        {
-            'name': 'SOL_M',
-            'listen_host': default_listen_host,
-            'external_host': default_external_host,
-            'port': 9007,
-            'max_content_length': default_max_content_length
-        },
-        {
-            'name': 'SOL_S',
-            'listen_host': default_listen_host,
-            'external_host': default_external_host,
-            'port': 9008,
-            'max_content_length': default_max_content_length
-        },
-        {
-            'name': 'WHI',
-            'listen_host': default_listen_host,
-            'external_host': default_external_host,
-            'port': 9009,
-            'max_content_length': default_max_content_length
         }
-
 
     ]
