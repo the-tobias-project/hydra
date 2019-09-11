@@ -164,6 +164,38 @@ script - here we are somewhat arbitrarily choosing the first.  If you run multip
 machine, you will need to maintain namespace uniqueness with respect to the `--plinkfile` argument - 
 this is because we use this to name an hdf5 file for the client.  
 
+
+#### Creating a distributed system
+An example client docker container is created from the `build/docker-compose.yml` file with service name `client`.  This
+client will communicate to the server over the docker network called `hydra_network`, thus allowing one to create two
+completely separate containers on the same physical machine.
+
+Of course, outside of a testing environment like the one just described, you can simply specify the IP addresses of
+each host.
+
+To connect to the client, first run `docker ps`, then use that output to attach to the client container.  In the
+following example, we will assume the server has already been started:
+
+```bash
+> docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                              NAMES
+68996b2109cf        hydra_app           "bash"                   7 minutes ago       Up 7 minutes        0.0.0.0:9001->9001/tcp             hydra_app_1
+53fd6c270431        hydra_client        "bash"                   7 minutes ago       Up 3 seconds                                           hydra_client_1
+
+> docker attach hydra_client_1
+root@hydra-client:/app# curl hydra_network:9001
+{
+  "detail": "The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.",
+  "status": 404,
+  "title": "Not Found",
+  "type": "about:blank"
+}
+```
+
+The `404` message above is success - it shows we can connect to the server!  For testing purposes, you can add
+additional services under the `build/docker-compose.yml` file, or create separate docker containers from the base image;
+the implementation is left as an exercise to the reader.
+
 ## Performing a GWAS
 We will start with an overview of the state machine:
 
