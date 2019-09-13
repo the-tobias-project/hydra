@@ -2,6 +2,7 @@
 
 if ! docker network ls | grep -q hydra-network; then
 	docker network create hydra-network
+	docker network create hydra-redis
 fi
 
 cp testData/download1kG.sh build/
