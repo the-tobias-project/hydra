@@ -91,25 +91,25 @@ class ServerHTTP(object):
 class ClientHTTP(object):
     default_max_content_length = 1024 * 1024 * 1024  # 1 GB
     default_listen_host = '0.0.0.0'
-    default_external_host = 'hydra_network'
+    default_external_host = 'localhost'
     clients = [{
             'name': 'Center1',
             'listen_host': default_listen_host,
-            'external_host': default_external_host,
+            'external_host': "Center1"#default_external_host,
             'port': 9002,
             'max_content_length': default_max_content_length
         },
         {
             'name': 'Center2',
             'listen_host': default_listen_host,
-            'external_host': default_external_host,
+            'external_host': "Center2"# default_external_host,
             'port': 9003,
             'max_content_length': default_max_content_length
         },
         {
             'name': 'Center3',
             'listen_host': default_listen_host,
-            'external_host': default_external_host,
+            'external_host': "Center3"#default_external_host,
             'port': 9004,
             'max_content_length': default_max_content_length
         }
