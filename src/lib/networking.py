@@ -40,17 +40,21 @@ def create_response(code, msg=None):
 
 def respond_to_server(path, verb, msg=None, client_name=None):
     url = f'{get_protocol()}://{ServerHTTP.external_host}:{ServerHTTP.port}/{path}'
+    print (url)
 
     s = requests.Session()
     req = requests.Request(method=verb, url=url, data=msg, params={'client_name': client_name})
     prepped = req.prepare()
+    print(3)
     s.send(prepped)
+    print(4)
 
 
 def get_protocol():
-    if current_app.config['ENV'] == 'development':
-        return 'http'
-    return 'https'
+        print (current_app.config['ENV'])
+        if current_app.config['ENV'] == 'development':
+            return 'http'
+        return 'https'
 
 
 def message_clients(address, client_name=None, args=None):

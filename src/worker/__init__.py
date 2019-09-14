@@ -8,6 +8,9 @@ import time
 # third party lib
 from celery import Celery
 from celery.utils.log import get_task_logger
+from flask import current_app, Flask
+from flask_celeryext import create_celery_app
+#from celery import current_app
 
 # internal lib
 from lib.settings import Settings
@@ -15,8 +18,12 @@ from worker import task_init, task_qc, task_pca, task_asso
 
 sys.path.append(os.path.abspath('../lib'))
 sys.path.append(os.path.abspath('../client'))
-
-app = Celery('cws_queue', broker=Settings.redis_uri, backend=Settings.redis_uri)
+app = Flask('__name__')
+app.config["CELERY_BROKER_URL"] = Settings.redis_uri
+app.config["CELERY_BACKEND_URL"] = Settings.redis_uri
+app = create_celery_app(app)
+#app = Celery('cws_queue', broker=Settings.redis_uri, backend=Settings.redis_uri)
+#app = app.conf.update(current_app.config)
 app.conf.task_serializer = 'pickle'
 app.conf.accept_content = ['pickle']
 logging = get_task_logger(__name__)

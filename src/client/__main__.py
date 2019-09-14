@@ -90,6 +90,8 @@ def configure_client(client, args):
         client['listen_host'] = args.listen_host
     if args.max_len is not None:
         client['max_content_length'] = args.max_len
+    if args.dev:
+        client['ENV'] = 'development'
     client['plinkfile'] = args.plinkfile
     shared.set_plinkfile(args.plinkfile)
 
@@ -98,6 +100,7 @@ def configure_client(client, args):
 
 def register_self(client, server_url):
     url = f'{server_url}/clients'
+    print(url)
     try:
         registered_clients = requests.get(url).json()
         self_name = client['name']
@@ -147,6 +150,8 @@ def main():
 
     app.config['MAX_CONTENT_LENGTH'] = client['max_content_length']
     app.config['client'] = client  # Store configuration for later use
+    if args.dev:
+        app.config['ENV'] = 'development'
 
     # Handle a teardown on sigint/sigterm
     signal.signal(signal.SIGINT, teardown)

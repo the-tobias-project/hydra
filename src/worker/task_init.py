@@ -6,7 +6,7 @@ import sys
 import time
 
 # third party lib
-from celery import current_app
+from flask import current_app
 import h5py
 import numpy as np
 from plinkio import plinkfile
