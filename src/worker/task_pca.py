@@ -12,8 +12,7 @@ from sklearn.utils.extmath import svd_flip
 # internal lib
 from client.lib import shared
 from lib import networking
-from lib.utils import write_or_replace
-from lib.corr import nancorr, process_plink_row
+from lib.corr import nancorr
 
 class LdReporter(object):
     __instance = None
@@ -39,14 +38,14 @@ class LdReporter(object):
             LdReporter(win_size, client_config)
         return LdReporter.__instance
 
-    def update(self, data, client_config):
+    def update(self, data, client_config, env):
         data = pickle.loads(data)
         n = self.store.attrs['n']
         msg = {}
         if self.r3 == 0: # fake start the first round
-            for chrom in self.chroms: 
-                # if the length is less than r1, you deserve an error. 
-                # No apologies 
+            for chrom in self.chroms:
+                # if the length is less than r1, you deserve an error.
+                # No apologies
                 tags = self.store["{}/PCA_passed".format(chrom)]
                 data[chrom] = tags[0:self.r1]
         for key, state in data.items():
@@ -58,7 +57,7 @@ class LdReporter(object):
                 if len(data) == 1: # Done with everything
                     msg = pickle.dumps({})
                     networking.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
-                                                 client_config['name'])
+                                                 client_config['name'], env)
                     print("Done with LD pruning")
                     return
                 continue
@@ -74,7 +73,7 @@ class LdReporter(object):
             corr = nancorr(genotypes)
             msg[chrom] = corr
         msg = pickle.dumps(msg)
-        networking.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'])
+        networking.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'], env)
         self.r3 += self.r2
         print(self.r3)
 
@@ -95,7 +94,7 @@ def store_filtered(message, client_config):
                 mask[:] = pcmask
 
 
-def report_cov(client_config):
+def report_cov(client_config, env):
     def standardize_mat(mat, af, sd):
         af = 2 * af.reshape(af.shape[0], 1)
         mat -= af
@@ -140,7 +139,7 @@ def report_cov(client_config):
                     msg["E"] = True
                 msg = pickle.dumps(msg)
                 #time.sleep(1)
-                networking.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'])
+                networking.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'], env)
         print(f"Final size will be {size}")
 
 

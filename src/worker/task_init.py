@@ -1,12 +1,11 @@
 # stdlib
 import os
 import pickle
-import socket
 import sys
 import time
 
 # third party lib
-from flask import current_app
+from celery import current_app
 import h5py
 import numpy as np
 from plinkio import plinkfile
@@ -16,17 +15,16 @@ from plinkio import plinkfile
 from client.lib import shared
 from lib import networking
 from lib.utils import write_or_replace
-from lib.corr import nancorr, process_plink_row
+from lib.corr import process_plink_row
 
-
-def init_store(client_config):
-    plinkToH5(client_config)
+def init_store(client_config, env):
+    plinkToH5(client_config, env)
     print("preparing counts")
-    report_counts(client_config)
+    report_counts(client_config, env)
     print('Finished reporting counts')
 
 
-def plinkToH5(client_config):
+def plinkToH5(client_config, env):
     """Gets plink prefix, produces an HDF file with the same prefix"""
     pfile = client_config['plinkfile']
     store_name = shared.get_plink_store(pfile)
@@ -87,7 +85,7 @@ def plinkToH5(client_config):
                     write_or_replace(current_group, 'counts', all_counts,
                         np.uint32)
 
-                    send_positions_to_server(positions, current_chr, client_config)
+                    send_positions_to_server(positions, current_chr, client_config, env)
                     positions = []
                     rsid = []
                     all_counts = []
@@ -110,12 +108,12 @@ def plinkToH5(client_config):
                              np.uint32)
             write_or_replace(current_group, 'rsids', rsids)
             write_or_replace(current_group, 'counts', all_counts, np.uint32)
-            send_positions_to_server(positions, current_chr, client_config)
+            send_positions_to_server(positions, current_chr, client_config, env)
     print('Closing plink file, finished with plinkToH5()')
     plink_file.close()
 
 
-def report_counts(client_config):
+def report_counts(client_config, env):
     """
     Report the counts (Het, homo Alt, missing)
     """
@@ -134,10 +132,10 @@ def report_counts(client_config):
             if chrom == keys[-1]:
                 countDict["END"] = True
             print(f'Sending counts for chrom {chrom}')
-            send_counts_to_server(countDict, client_config)
+            send_counts_to_server(countDict, client_config, env)
 
 
-def send_positions_to_server(positions, chrom, client_config):
+def send_positions_to_server(positions, chrom, client_config, env):
     client_name = client_config['name']
 
     data = pickle.dumps({
@@ -145,23 +143,23 @@ def send_positions_to_server(positions, chrom, client_config):
         'POS': positions
     })
 
-    networking.respond_to_server('api/tasks/INIT/POS', 'POST', data, client_name)
+    networking.respond_to_server('api/tasks/INIT/POS', 'POST', data, client_name, env)
 
 
-def send_counts_to_server(data, client_config):
+def send_counts_to_server(data, client_config, env):
     print('sending counts to server')
     client_name = client_config['name']
     data = pickle.dumps(data)
-    networking.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name)
+    networking.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name, env)
     print('sent counts to server')
 
 
-def init_stats(message, client_config):
+def init_stats(message, client_config, env):
     print('Inside init_stats')
     # Wait on previous tasks to finish
     i = current_app.control.inspect()
     client_name = client_config['name']
-    while True:
+    while i.active() is not None:
         active_tasks = i.active()[f'celery@{client_name}']
         dependent_tasks = list(filter(lambda x: x['name'] == 'tasks.init_store', active_tasks))
         if len(dependent_tasks) > 0:
@@ -192,8 +190,8 @@ def init_stats(message, client_config):
             vals = message["VAR"]
             task = "VAR"
             dset = chrom_group.create_dataset(task, data=vals)
-    print('Finished with init_stats')
+    print('Finished with init_stats.')
 
     client_name = client_config['name']
-    status = f'Finished with init stats for chrom {chrom}'
-    networking.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST')
+    status = f'Finished with init stats for chrom {chrom}.'
+    networking.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST', env=env)

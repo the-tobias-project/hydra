@@ -2,7 +2,7 @@
 import logging
 
 # third party lib
-from flask import current_app, jsonify, make_response
+from flask import jsonify, make_response
 import requests
 
 # internal lib
@@ -38,26 +38,21 @@ def create_response(code, msg=None):
     return make_response(jsonify(envelope), code)
 
 
-def respond_to_server(path, verb, msg=None, client_name=None):
-    url = f'{get_protocol()}://{ServerHTTP.external_host}:{ServerHTTP.port}/{path}'
-    print (url)
-
+def respond_to_server(path, verb, msg=None, client_name=None, env='production'):
+    url = f'{get_protocol(env)}://{ServerHTTP.external_host}:{ServerHTTP.port}/{path}'
     s = requests.Session()
     req = requests.Request(method=verb, url=url, data=msg, params={'client_name': client_name})
     prepped = req.prepare()
-    print(3)
     s.send(prepped)
-    print(4)
 
 
-def get_protocol():
-        print (current_app.config['ENV'])
-        if current_app.config['ENV'] == 'development':
-            return 'http'
-        return 'https'
+def get_protocol(env='production'):
+    if env == 'development':
+        return 'http'
+    return 'https'
 
 
-def message_clients(address, client_name=None, args=None):
+def message_clients(address, client_name=None, args=None, env='production', data=None):
     clients = Registry.get_instance().list_clients()
     if client_name is None:
         client_list = clients
@@ -65,6 +60,6 @@ def message_clients(address, client_name=None, args=None):
         client_list = list(filter(lambda x: x["name"] == client_name, clients))
     for client in client_list:
         if args is None:
-            requests.post(f'{get_protocol()}://{client["external_host"]}:{client["port"]}/api/{address}')
+            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}', data=data)
         else:
-            requests.post(f'{get_protocol()}://{client["external_host"]}:{client["port"]}/api/{address}', params=args)
+            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}', params=args, data=data)

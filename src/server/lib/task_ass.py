@@ -2,21 +2,21 @@
 import logging
 import pickle
 import os
-import pdb
 import time
 
 # third party lib
-import requests
 import h5py
 import numpy as np
 from scipy.stats import chi2
 from numpy.linalg import _umath_linalg
+from flask import current_app as app
 
 
 # internal lib
 from lib.settings import Settings, Options, PCAFilterNames, Commands
 from lib.client_registry import Registry
 from lib.utils import write_or_replace
+import lib.networking as networking
 
 #from  sklearn.linear_model import LogisticRegression as lr
 
@@ -106,7 +106,7 @@ class LogisticAdmm(object):
                 ind = self.normalization_stats["Indx"]
 
                 n = float(self.normalization_stats["N"])
-                
+
                 mu = self.normalization_stats["Sums"]/n
                # pdb.set_trace()
 
@@ -122,13 +122,11 @@ class LogisticAdmm(object):
 
     def send_request(self, data, subtask):
         to_send = pickle.dumps(data)
-        for client in clients:
-            requests.post(f'http://{client["external_host"]}:{client["port"]}/api/asso/{subtask}',
-                data=to_send)
+        networking.message_clients(f"asso/{subtask}", data=to_send, env=app.config["ENV"])
 
     def update(self, message):
         message = pickle.loads(message)
-        #if "H" in message: 
+        #if "H" in message:
         #    pdb.set_trace()
         z_hat = message["VALS"]
         model = message["Estimated"]
@@ -311,7 +309,7 @@ class LogisticAdmm(object):
             self.send_request(msg, "query")
         self.linesearch_convergence[model] = convergence_status.copy()
         del self.Hess[model], self.Gradients[model]
-        self.Diags[model] = ds[np.logical_not(convergence_status)[:,0],:]  # repurposed 
+        self.Diags[model] = ds[np.logical_not(convergence_status)[:,0],:]  # repurposed
         #self.fchanges[model] = dfxs[np.logical_not(convergence_status)]
         self.fchanges[model] = dfxs
 
@@ -347,10 +345,10 @@ class LogisticAdmm(object):
         #fs = self.Vals[model][notConverged] + self.t * self.alpha * self.fchanges[model][notConverged[np.logical_not(self.converged[model])]]
         toUpdate = vals < fs[:, np.newaxis]
         nowConverged = notConverged.copy()
-        nowConverged[notConverged] = np.logical_and(notOverallConverged[notOverallConverged], toUpdate[:,0]) 
+        nowConverged[notConverged] = np.logical_and(notOverallConverged[notOverallConverged], toUpdate[:,0])
         #accept = np.logical_and(toUpdate, notConverged np.logical_not(convergence_status[convergence_status][:,np.newaxis]))
         temp = self.estimates[model][np.logical_not(self.converged[model][:,0])]
-        temp[toUpdate[:,0],:,0] += self.t * self.Diags[model][toUpdate[:,0]] 
+        temp[toUpdate[:,0],:,0] += self.t * self.Diags[model][toUpdate[:,0]]
         self.estimates[model][np.logical_not(self.converged[model][:,0])] = temp
         #self.estimates[model][nowConverged[:,0],:,0] += self.t * self.Diags[model][toUpdate[:,0]]
         #self.estimates[model][np.logical_not(self.linesearch_convergence[model])[:,0],:][accept[:,0],:][:,:,0] += self.t * self.alpha * self.Diags[model][toUpdate[:,0]]
@@ -370,7 +368,7 @@ class LogisticAdmm(object):
             self.Diags[model] = temp[np.logical_not(toUpdate[:,0]), :]
             self.linesearch_convergence[model] = np.logical_not(notConverged)
         else: # All approved, start a new iteration of main algo
-            msg = {"Estimated": model, "unconv": np.logical_not(self.converged[model]), 
+            msg = {"Estimated": model, "unconv": np.logical_not(self.converged[model]),
                 'VALS': self.estimates[model][np.logical_not(self.converged[model])[:,0],:] }
             self.send_request(msg, "estimate")
             del self.Diags[model]

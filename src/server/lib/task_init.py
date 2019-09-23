@@ -6,13 +6,15 @@ import pickle
 # third party lib
 import h5py
 import numpy as np
-import requests
+from lib import networking
+from flask import current_app as app
 
 # internal lib
-from lib.corr import corr, hweP
+from lib.corr import hweP
 from lib.settings import Settings, Commands
 from lib.utils import write_or_replace
 from lib.client_registry import Registry
+
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
@@ -20,10 +22,7 @@ store = h5py.File(storePath, "a")
 
 
 def start_init_task():
-    clients = Registry.get_instance().list_clients()
-    for client in clients:
-        Registry.get_instance().set_client_state(client['name'], Commands.INIT)
-        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/init')
+    networking.message_clients("init", env=app.config["ENV"])
 
 
 def store_positions(data):
@@ -93,8 +92,8 @@ def count_stats():
             "VAR": var
         }
         msg = pickle.dumps(msg)
+        networking.message_clients("init/stats", env=app.config["ENV"], data=msg)
         for client in clients:
             Registry.get_instance().set_client_state(client['name'], Commands.INIT_STATS)
-            requests.post(f'http://{client["external_host"]}:{client["port"]}/api/init/stats', data=msg)
 
         hwe_dset = store.create_dataset("{}/hwe".format(chrom), data=hwe)

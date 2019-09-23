@@ -2,16 +2,18 @@
 import logging
 import pickle
 import os
+import time
 
 # third party lib
-import requests
 import h5py
 import numpy as np
+from flask import current_app as app
 from scipy.sparse.linalg import eigsh as eig
 
 # internal lib
-from lib.settings import Settings, PCAFilterNames, Commands
+from lib.settings import Settings, PCAFilterNames, Commands, ServerHTTP
 from lib.client_registry import Registry
+from lib import networking
 from . import task_qc
 from lib.corr import corr
 
@@ -72,16 +74,13 @@ class CovarianceAggregator(object):
         if CovarianceAggregator.__instance is None:
             CovarianceAggregator(num_clients, win_size)
         return CovarianceAggregator.__instance
-    
+
     def send_request(self, data, params=None):
         to_send = pickle.dumps(data)
-        for client in clients:
-            if not params:
-                requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/ld',
-                              data=to_send)
-            else:
-                requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/ld',
-                              data=to_send, params=params)
+        if params is None:
+            networking.message_clients("pca/ld", env=app.config["ENV"], data=to_send)
+        else:
+            networking.message_clients("pca/ld", env=app.config["ENV"], data=to_send, args=params)
 
     def update(self, message):
         msg = pickle.loads(message)
@@ -146,25 +145,46 @@ class CovarianceAggregator(object):
 #            self.tqdm.update(self.r2)
 
 
+class Position_reporter(object):
+    __instance = None
+
+    def __init__(self):
+        if CovarianceAggregator.__instance is not None:
+            return
+        else:
+            self.incrementor = len(clients)
+    def report_pos(self):
+        if self.incrementor > 1:
+            self.incrementor -= 1
+        else:
+            for chrom in store:
+                    if chrom == "meta":
+                        continue
+                    data = {}
+                    data[chrom] = store[f"{chrom}/PCA_passed"].value
+                    msg = pickle.dumps(data)
+                    networking.message_clients("pca/pcapos", data=msg, env=app.config["ENV"])
+            time.sleep(ServerHTTP.wait_time) #TODO fix this hack. Give time for clients to finish
+            networking.message_clients("pca/cov", data=msg, env=app.config["ENV"])
+
+
+
+
 def report_pos(client_names=None):
-    if client_names is None:
-        client_list = clients
-    else:
-        client_list = list(filter(lambda x: x['name'] not in client_names, clients))
     for chrom in store:
         if chrom == "meta":
             continue
-        for client in client_list:
-            data = {}
-            data[chrom] = store[f"{chrom}/PCA_passed"].value
-            msg = pickle.dumps(data)
-            requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/pcapos', msg)
-
+        data = {}
+        data[chrom] = store[f"{chrom}/PCA_passed"].value
+        msg = pickle.dumps(data)
+        networking.message_clients("pca/pcapos", data=msg, env=app.config["ENV"])
+    time.sleep(ServerHTTP.wait_time) #TODO fix this hack. Give time for clients to finish
+    networking.message_clients("pca/cov", data=msg, env=app.config["ENV"])
 
 def store_covariance(client_name, data):
-    # store the chunks in the store. build on them 
+    # store the chunks in the store. build on them
     msg = pickle.loads(data)
-    ch1 = msg["CH1"] 
+    ch1 = msg["CH1"]
     ch2 = msg["CH2"]
     logging.info("dealing with {}_{}".format(ch1, ch2))
     if "meta" not in store:
@@ -234,8 +254,4 @@ def eigenDecompose(n_components=10):
     print(chroms)
     msg = {"ISIG": inv_sigma, "V": v, "CHROMS": chroms}
     msg = pickle.dumps(msg)
-    for client in clients:
-        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/pca/eig',
-                      data=msg)
-
-
+    networking.message_clients("pca/eig", data=msg, env=app.config["ENV"])

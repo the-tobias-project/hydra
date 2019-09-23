@@ -4,22 +4,20 @@ import logging
 # Third party lib
 from flask import Blueprint, request
 from flask import current_app as app
-from celery import Celery
 
 # Internal lib
 from lib import networking
-from lib.settings import Settings
 
 bp = Blueprint('root', __name__, url_prefix='/api')
-celery_client = Celery(broker=Settings.redis_uri, backend=Settings.redis_uri)
-
+#celery_client = Celery(broker=Settings.redis_uri, backend=Settings.redis_uri)
+from worker.tasks import celery as celery_client
 
 @bp.route('/init', methods=['POST'])
 def init():
     logging.info('Got command to initialize')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.init_store',
-                            [app.config['client']],
+            [app.config['client'], app.config["ENV"]],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
@@ -30,7 +28,7 @@ def init_stats():
     logging.info('Got command to store initialized stats')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.init_stats',
-                            [request.data, app.config['client']],
+                            [request.data, app.config['client'], app.config["ENV"]],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
@@ -60,7 +58,7 @@ def qc():
     logging.info('Got command for QC')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.init_qc',
-                            [request.data, app.config['client']],
+                            [request.data, app.config['client'], app.config['ENV']],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
@@ -71,7 +69,7 @@ def ld_report():
     logging.info('Got command for LD')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.report_ld',
-                            [request.data, app.config['client']],
+                            [request.data, app.config['client'], app.config['ENV']],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
@@ -93,7 +91,7 @@ def communicate_cov():
     logging.info('Preparing to report covariances')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.report_cov',
-                            [app.config['client']],
+                            [app.config['client'], app.config['ENV']],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)

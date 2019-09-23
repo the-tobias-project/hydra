@@ -3,16 +3,16 @@ import logging
 import pickle
 import re
 import os
-import pdb
 
 # third party lib
-import requests
 import h5py
 import numpy as np
+from flask import current_app as app
 
 # internal lib
 from lib.settings import Settings, Options, Commands
 from lib.client_registry import Registry
+from lib import networking
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
@@ -45,10 +45,11 @@ def split_command(command):
 
 
 def start_client_qc_task(filters, stage=Commands.QC):
+    data = pickle.dumps(filters)
+    networking.message_clients("qc", data=data, env=app.config["ENV"])
     for client in clients:
         Registry.get_instance().set_client_state(client['name'], stage)
-        data = pickle.dumps(filters)
-        requests.post(f'http://{client["external_host"]}:{client["port"]}/api/qc', data=data)
+
 
 
 def start_local_qc_task(filters, prefix=None):  # Filter based on local info
@@ -65,14 +66,14 @@ def start_local_qc_task(filters, prefix=None):  # Filter based on local info
         hwe    = group['hwe']
         tokeep = np.ones(shape=pos.value.shape, dtype=bool)
         if Options.HWE in filters:
-            val = filters[Options.HWE]
+            val = float(filters[Options.HWE])
             tokeep = np.logical_and(tokeep, hwe.value > val)
         if Options.MAF in filters:
-            val = filters[Options.MAF]
+            val = float(filters[Options.MAF])
             tokeep = np.logical_and(tokeep, af.value > val - Settings.kSmallEpsilon)
             tokeep = np.logical_and(tokeep, 1.0-af.value > val - Settings.kSmallEpsilon)
         if Options.MPS in filters:
-            val = filters[Options.MPS]
+            val = float(filters[Options.MPS])
             tokeep = np.logical_and(tokeep, mr.value < val)
         logging.info("In chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
             tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))

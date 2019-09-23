@@ -3,19 +3,18 @@ import argparse
 import logging
 import signal
 import sys
+import os
 
 # third party lib
-from flask import Flask
 import requests
 
 # Internal lib
 from client.lib import shared
 from lib import settings
+import worker
+from worker import factory
 
 # Routes
-from client.routes import tasks
-
-app = Flask(__name__)
 
 server_host = settings.ServerHTTP.external_host
 server_port = settings.ServerHTTP.port
@@ -51,7 +50,7 @@ def parse_args():
                         required=True)
     """
     The plinkfile is not of type argparse.FileType, as the base name won't exist
-    
+
     e.g. popres1 is what we use to get popres1.[ind, bim, bam, fam], but popres1 doesn't exist.
     """
     parser.add_argument('--plinkfile',
@@ -92,6 +91,7 @@ def configure_client(client, args):
         client['max_content_length'] = args.max_len
     if args.dev:
         client['ENV'] = 'development'
+        os.environ["FLASK_ENV"] = "development"
     client['plinkfile'] = args.plinkfile
     shared.set_plinkfile(args.plinkfile)
 
@@ -122,7 +122,7 @@ def register_self(client, server_url):
     return True
 
 
-def teardown(signum, frame):
+def teardown(signum, frame, app):
     try:
         client = app.config['client']
         base_url = BaseURL.get_instance(None).url  # Should always be initialised when we get here; passing None is OK
@@ -139,7 +139,7 @@ def main():
     args = parse_args()
     client = next(filter(lambda x: x['name'] == args.name, settings.ClientHTTP.clients))
     setup_logging(args.name)
-
+    app = factory.create_app(celery=worker.celery)
     app.config.update(
         CELERY_BROKER_URL='redis://localhost:6379',
         CELERY_RESULT_BACKEND='redis://localhost:6379'
@@ -154,10 +154,10 @@ def main():
         app.config['ENV'] = 'development'
 
     # Handle a teardown on sigint/sigterm
-    signal.signal(signal.SIGINT, teardown)
-    signal.signal(signal.SIGTERM, teardown)
-
-    app.register_blueprint(tasks.bp)
+    def _teardown(signum, frame):
+        teardown(signum, frame, app)
+    signal.signal(signal.SIGINT, _teardown)
+    signal.signal(signal.SIGTERM, _teardown)
 
     server_url = BaseURL.get_instance(args.dev).url
     if not register_self(client, server_url):
