@@ -1,0 +1,105 @@
+version: '3.7'
+services:
+  app:
+    hostname: hydra
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash
+    environment:
+      - CONFIG_PATH=/app/build/config.yml
+    ports:
+      - "9001:9001"
+    volumes:
+      - "..:/app:rw"
+      - "/scratch"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    tty: true
+    stdin_open: true
+    working_dir: /app
+    networks:
+     hydra-network:
+       aliases:
+         - hydra_network
+  redis:
+    image: redis:5.0.4
+    ports:
+      - "9200:9200"
+    networks:
+      hydra-network:
+        aliases:
+          - hydra_redis
+  client0:
+    container_name: Center1
+    hostname: hydra-client
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash
+    environment:
+      - CONFIG_PATH=/app/build/config.yml
+    volumes: 
+      - "..:/app:rw"
+      - "/scratch"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - type: bind 
+        source: "$PWD/testData/Center1/"
+        target: "/app/data"
+    tty: true
+    stdin_open: true
+    working_dir: /app
+    networks:
+      hydra-network:
+        aliases:
+          - hydra_network
+  client1:
+    container_name: Center2
+    hostname: hydra-client
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash
+    environment:
+      - CONFIG_PATH=/app/build/config.yml
+    volumes:
+      - "..:/app:rw"
+      - "/scratch"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - type: bind 
+        source: "$PWD/testData/Center2/"
+        target: "/app/data"
+    tty: true
+    stdin_open: true
+    working_dir: /app
+    networks:
+      hydra-network:
+        aliases:
+          - hydra_network
+  client2:
+    container_name: Center3
+    hostname: hydra-client-3
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash
+    environment:
+      - CONFIG_PATH=/app/build/config.yml
+    volumes:
+      - "..:/app:rw"
+      - "/scratch"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - type: bind 
+        source: "$PWD/testData/Center3/"
+        target: "/app/data"
+    tty: true
+    stdin_open: true
+    working_dir: /app
+    networks:
+      hydra-network:
+        aliases:
+          - hydra_network
+networks:
+  hydra-network:
+    external:
+      name: hydra-network
+
