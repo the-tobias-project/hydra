@@ -27,17 +27,13 @@ root@hydra:/app#
 
 ### Build the image yourself
 
-To run the setup, first navigate to this directory, then run the following:
+To run the setup first download the binary files (ending with `.so`) from [here](https://console.cloud.google.com/storage/browser/hydra-example-data). Then navigate to this directory and run the following:
 
 `bash up.sh`
 
 (or, if the executable bit is active, `./up.sh`)
 
-This will first build your image to include all necessary libraries and runtime requirements, then run the data prep
-script located in `testData/`.  This script may take anywhere between 10 minutes to several hours to complete,
-depending on network connections and computational resources available.
-
-Once the `up.sh` script has completed, you should find yourself inside the docker container with a prompt that looks
+This will build your image to include all necessary libraries and runtime requirements. Once the `up.sh` script has completed, you should find yourself inside the docker container with a prompt that looks
 like this:
 
 ```bash
