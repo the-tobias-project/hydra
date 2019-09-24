@@ -1,20 +1,27 @@
 # Example GWAS 
 
-In this example, we use HYDRA to run a GWAS on 1K Genome data split between 3 silos using a fake phenotype. 
+In this example, we use HYDRA to run a GWAS on 1K Genome data split between 3 silos using a fake phenotype. The 2504 individual dataset is split into 3 silos N=(900, 900, 704) per silo. For illustration purposes, we have restricted the dataset to 150k snps from chromosomes 20-22.
 
 ## Data
 
-Download the [data](https://console.cloud.google.com/storage/browser/hydra-example-data) (Center{i}) them in a folder named testData and unzip the files. Download the compiled files (ending with .so) and place them in the lib folder.
+Create the `testData` subdirectory (`mkdir testData`). Download the Center specific [data](https://console.cloud.google.com/storage/browser/hydra-example-data) and unzip the folders in `testData`. Download the compiled files (ending with .so) and place them in the src/lib folder.
+
+You can generate the test dataset using `download1kG.sh` after setting up the container using the following command
+
+```bash 
+docker exec -it hydra_app_1 "download1kG.sh"
+```
+Note that processing the whole genome files is slow. You can also use your own data by simply splitting the plink files and placing them in the corresponding data folders.
 
 ## Container setup. 
 
-We will split the data between 3 centers. We require 2 shell terminals for each center and one shell terminal for the server. In the server shell terminal build the container images: 
+The data has been splitted between 3 centers. We require 2 shell terminals for each center and one shell terminal for the server. In the shell screent to be used for server build the container images: 
 
 ```bash
 bash-3.2$ bash  up.sh
 ```
 
-This script creates the containers and initializes 3 containers for the three centers. At the end of the script, it attaches the server container. Start the server...
+This script creates the containers and initializes 3 containers for the three centers. After starting up the containers the script attaches the server container to the current shell terminal and you should see the prompt change to `root@hydra`. Start the server...
 
 ```bash 
 root@hydra:/app# cd /app/src
@@ -27,7 +34,7 @@ root@hydra:/app/src# python -m server --dev 1
 At this point, you can head over to `http://localhost:9001/api/ui/` in a browser to monitor and control the server.
 
 
-Next, we will setup all the clients. Attach to each server and run the client...
+Next, we will setup all the clients. On a different shell terminal, attach to each server and run the client...
 
 ```bash
 bash-3.2$ docker attach Center1
@@ -50,5 +57,7 @@ Change "Center1" as appropriate for each container.
 
 ## GWAS
 
-Now we are ready to run a GWAS
+Now we are ready to run a GWAS. This can be done through the UI or using `curl` commands. In the UI, click on "tasks->/tasks/{task_name}". Select "INIT" from the drop-down list of task_names and press "Try it out!". You should see a confirmation of this command on the server side and soon after on the client side. The worker will provide periodic updates as it works through the initialization steps. Once the process is over follow up with QC, PCA and ASSO in the same way. 
+
+
 

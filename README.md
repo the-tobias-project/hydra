@@ -45,45 +45,33 @@ root@hydra:/app#
 ```
 
 Additionally, if you run `docker ps`from the host machine, you should see two new containers currently running - one
-for HYDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HYDRA (e.g. `hydra_redis_1`).  
+for HYDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HYDRA (e.g. `hydra_redis_1`). 
+    
 We use Celery to manage client jobs, and Celery uses Redis as its' communication backbone.
 
-To run the experiments on a sample data set, please follow the directions under [data prep](#data-prep-details)
+To run the experiments on your dataset, please follow the directions under [data prep](#data-prep-details)
 
-## Downloading test data: 
+## Tutorial  
 
-In this step we download chromosomes 20-22 from 1KG project and split the data (by individuals) between three separate silos. This is for demonstration purposes. 
-
-Once the container is running execute the download command from within it: 
-
-```bash
-docker exec -it hydra_app_1 "download1kG.sh"
-```
-
-Downloading and splitting the data is slow and may take ~ 30 mins.
-
-You can use your own data by simply splitting the plink files and placing them in the corresponding data folders. 
+The easiest way to familiarize yourself with the pipeline is following the short tutorial in the [example](tree/master/example) file. In this short tutorial, we run a mock GWAS using publicly available 1K genomes data.
 
 
 ## Running the server, client(s), and worker(s)
-You will need at least three terminal sessions of some sort for a minimal run on a single machine.  There are many
-strategies for accomplishing this within the same docker session (e.g. tmux, screen, ...), but the recommended method
-is to open three separate terminals on the host machine, then connect to the running container with each terminal.  This
-allows one to see the state of the entire system with a minimal set of commands.
 
 To connect to a running docker container with a new terminal, assuming the container name is `hydra_app_1`, run:
 
 `docker exec -it hydra_app_1 bash`
 
+
 #### Running the server
 Prerequisites: None
 
-Running the server is the simplest of all:
+Running the server is as simple as connecting to the `hydra_app` container and executing the following commands:
 ```bash
 cd /app/src
 python -m server
 ```
-It should look something like this:
+The response should look something like this:
 ```bash
 root@hydra:/app# cd src
 root@hydra:/app/src# python -m server
@@ -98,19 +86,37 @@ root@hydra:/app/src# python -m server
 From here you can explore the API on a web browser on the same machine by visiting `http://localhost:9001/api/ui/`
 
 The server invoked without any arguments assumes the default configuration inside [`src/lib/settings.py`](src/lib/settings.py).
-You can override the defaults by either modifying that file directly, or adding arguments to the command line invocation.
+These defaults can be overriden by either modifying that file directly, or adding arguments to the command line invocation.
 Details can be accessed by calling `python -m server --help`.
+
+#### Running the client
+Prerequisites: A running server
+
+On startup, the client registers itself with the server - hence the dependency on a running server.  The
+server uses this registration to later send out further tasks to each individual client.  On
+client SIGTERM or SIGINT, (e.g. `control + c`) it will attempt to unregister itself from the server.
+
+Starting the client also requires some configuration - For all examples, we assume the client name is `Center1`:
+
+```bash
+cd /app/src
+python -m client --name=Center1 --plinkfile=/app/testData/dset1 
+```
+
+This barebones call assumes the defaults inside [`src/lib/settings.py`](src/lib/settings.py), which can be overwritten
+either by the modifying the file, or on the command-line invocation.  Call `python -m client --help` for details.
+
 
 #### Running the worker
 Prerequisites: None
 
 The worker needs to be associated with the client it's serving - this is done by giving both the same
-name.  Here we assume the name is `BioME`, which is within the list of clients inside 
+name.  Here we assume the name is `Center1`, which is within the list of clients inside 
 [`src/lib/settings.py::ClientHTTP`](src/lib/settings.py).  Any modifications should be reflected within that class.
 
 ```bash
 cd /app/src
-C_FORCE_ROOT=1 celery -A worker worker -Q BioME -n BioME --concurrency=1
+C_FORCE_ROOT=1 celery -A worker worker -Q Center1 -n Center1 --concurrency=1
 ```
 
 Which results in something like this:
@@ -141,28 +147,6 @@ User information: uid=0 euid=0 gid=0 egid=0
                 .> BioME            exchange=BioME(direct) key=BioME
 ```
 Because we are running inside a sandboxed Docker environment, we can safely ignore the superuser warning.
-
-#### Running the client
-Prerequisites: A running server
-
-On startup, the client registers itself with the server - hence the dependency on a running server.  The
-server uses this registration to later send out further tasks to each individual client.  On
-client SIGTERM or SIGINT, (e.g. `control + c`) it will attempt to unregister itself from the server.
-
-Starting the client also requires some configuration - again we are assuming the client name is `BioME`:
-
-```bash
-cd /app/src
-python -m client --name=BioME --plinkfile=/app/testData/dset1 
-```
-
-This barebones call assumes the defaults inside [`src/lib/settings.py`](src/lib/settings.py), which can be overwritten
-either in the file itself, or on the command-line invocation.  Call `python -m client --help` for details.
-
-You may notice that there are three sets of `dset` files produced from the `testData/download1kG.sh`
-script - here we are somewhat arbitrarily choosing the first.  If you run multiple clients on the same 
-machine, you will need to maintain namespace uniqueness with respect to the `--plinkfile` argument - 
-this is because we use this to name an hdf5 file for the client.  
 
 
 #### Creating a distributed system
@@ -212,23 +196,27 @@ We will start with an overview of the state machine:
      +<----------------------------------------------+
      |
      v
-+----+-----+          +-----------+
-|          |          |           |
-|          |          |           |
-|    QC    +--------->+    PCA    |
-|          |          |           |
-|          |          |           |
-+----------+          +-----------+
++----+-----+          +-----------+          +-----------+
+|          |          |           |          |           |
+|          |          |           |          |           |
+|    QC    +--------->+    PCA    +--------->+    ASSO   |
+|          |          |           |          |           |
+|          |          |           |          |           |
++----------+          +-----------+          +-----------+
 ```
 
 Assuming you want `N` clients, once you see that the server has `N` clients registered,
-you will need to start the three tasks `[init, qc, pca]`:
+you will need to sequentially start the tasks `[init, qc, pca, asso]`:
 
 ```bash
 curl http://localhost:9001/api/tasks/INIT -X POST
 curl http://localhost:9001/api/tasks/QC -X POST
 curl http://localhost:9001/api/tasks/PCA -X POST
+curl http://localhost:9001/api/tasks/ASSO -X POST
 ```
+These tasks can also be started using the UI. 
+
+
 1\) Initialization: `curl http://localhost:9001/api/tasks/INIT -X POST`
 
 You will need to monitor the server logs to ensure you don't tell the server to start a task before the
@@ -305,35 +293,27 @@ And in the logs of the server:
 [INFO ] [...] :: 122 => 127.0.0.1 - - [09/May/2019 01:33:17] "POST /api/tasks/PCA/COV?client_name=BioME HTTP/1.1" 200 -
 ```
 
-The remaining snp counts for each chromosome should be exact matches.
 
 As the clients perform their tasks, they may send further subtasks to the server - these 
 will show up in the server logs, along with the name of the client that sent the task.
 Additionally, once the task is completed, the client will send a status update to the
 server, which will again show up in the server logs.
 
-## Data prep details
-
-We will use chromosome 20, 21, and 22 from 1000 Genomes phase 3 for demonstration purposes (n=2504). You
-can find the relevant dataset in `testData/`, or download a copy using `testData/download1kG.sh`.  For
-the purposes of this demo, the data has been thinned to contain 100k snps, and the individuals are
-split into 3 separate datasets.
-
-Running the `testData/download1kG.sh` script will take approximately 20 minutes to one hour to complete, depending
-on your network connection and your computing power.  You will also need approximately 45 GB of free disk space.
 
 ## Troubleshooting
 
-1.  Issues with `lib.corr`
-
-    You can attempt a recompile from within the `build/` directory with the following:
-
-    `python compiler.py build_ext --inplace`
-
-    Then move the compiled file into `src/lib`.
-
-2.  Issues with opening or creating a file
+1.  Issues with opening or creating a file
 
     This can happen if you attempt to run initialization a second time without first clearing
     the scratch directory.  Try shutting down the server and all clients, clearing the scratch
     directory, then starting them up again.
+
+<!---
+1.  Issues with `lib.corr`
+
+    You can attempt a recompile from within the `build/` directory with the following:
+
+    `python compiler.py build_ext \-\-inplace`
+
+    Then move the compiled file into `src/lib`.
+-->
