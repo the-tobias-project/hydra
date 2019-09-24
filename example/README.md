@@ -4,7 +4,7 @@ In this example, we use HYDRA to run a GWAS on 1K Genome data split between 3 si
 
 ## Data
 
-Download the [data](https://console.cloud.google.com/storage/browser/hydra-example-data) and place it in a folder named testData and unzip the files.
+Download the [data](https://console.cloud.google.com/storage/browser/hydra-example-data) (Center{i}) them in a folder named testData and unzip the files. Download the compiled files (ending with .so) and place them in the lib folder.
 
 ## Container setup. 
 
@@ -37,5 +37,18 @@ root@hydra-client:/app/src# python -m client --name=Center1 --plinkfile=/app/dat
 
 You should see a confirmation of registration on the client side and the server terminal. You can also check to see all the registered clients in the UI. 
 
-The last step in the setup is starting up the workers
+The last step in the setup is starting up the workers. We need to connect to each container and run a separate worker. 
+
+```bash
+root@hydradocker exec -it Center1 "bash"
+root@hydra-client:/app# cd src/
+C_FORCE_ROOT=1  celery -A celery_worker.celery worker -Q Center1 -n Center1 --concurrency=1
+```
+
+Change "Center1" as appropriate for each container. 
+
+
+## GWAS
+
+Now we are ready to run a GWAS
 
