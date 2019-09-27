@@ -15,15 +15,20 @@ The recommended setup requires the following:
 This may be the fastest way, given a good network connection between your machine and
 the docker hub:
 
-1. `docker pull edolfostanford/hydra`
-2. `docker run --name hydra --expose 9001 --hostname hydra -it edolfostanford/hydra bash`
 
-After running this, you should find yourself inside the docker container with a prompt that looks
+Server side: 
+1. `docker pull apoursh/hydra:0.1`
+2. `docker network create hydra-network`
+3. `docker run --name hydra -p 9001:9001 --hostname hydra -it apoursh/hydra:0.1 bash`
+
+
+After running step 3, you should find yourself inside the docker container with a prompt that looks
 like this:
 
 ```bash
 root@hydra:/app#
 ```
+On the client side, you will also need to run: `docker network create hydra-redis`
 
 ### Build the image yourself
 

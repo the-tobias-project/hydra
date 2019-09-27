@@ -9,7 +9,7 @@ from sklearn.metrics import log_loss
 from scipy.stats import chi2
 from memory_profiler import profile
 import glob
-#import logging 
+#import logging
 SCRATCH = "/local/scratch/armin"
 
 def setup_custom_logger(name):
@@ -32,21 +32,21 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
   if not plink_file.one_locus_per_row( ):
     print( "This script requires that snps are rows and samples columns." )
     exit(1)
-  
+
   sample_list = plink_file.get_samples()
-  
+
   locus_list = plink_file.get_loci()
   n = len(sample_list)
   p = len(locus_list)
   edge_offset = 100
   causal_mut_index = np.linspace(edge_offset, p-edge_offset, multigenecity, dtype=int)
-  gen_effect_size_unnormalized = {item: np.random.normal(loc=0, 
+  gen_effect_size_unnormalized = {item: np.random.normal(loc=0,
     scale=float(h)/np.sqrt(multigenecity)) for item in causal_mut_index}
   print causal_mut_index
   causal_mutations = set()
   mutation_meta = {}
   prs = np.zeros(n)
-  for i, variant in enumerate(locus_list): 
+  for i, variant in enumerate(locus_list):
     row = plink_file.next()
     if i in causal_mut_index:
       genotypes = np.fromiter(row, dtype=float)
@@ -63,11 +63,11 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
 
   burden = gen_effect_size + env_effect_size
   sorted_i = np.argsort(burden)[::-1]
-  
+
   ncases = int(n * p_cases)
   cases_i = set(sorted_i[:ncases])
-  
-  # write new plink file 
+
+  # write new plink file
   for i, sample in enumerate(sample_list):
     sample_list[i].affection = int(i in cases_i)
 
@@ -75,10 +75,10 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
   plink_write = plinkfile.WritablePlinkFile( out, sample_list )
   #plinkio doesn't have seek? so we close it when we don't need it and reopen it here
   plink_file = plinkfile.open( plink_in )
-  for i, variant in tqdm.tqdm(enumerate(locus_list)): 
+  for i, variant in tqdm.tqdm(enumerate(locus_list)):
     row = plink_file.next()
     plink_write.write_row(variant, row)
-  
+
   plink_write.close()
   plink_file.close()
 
@@ -104,14 +104,14 @@ def run_gwas(imputed, toPCA, out, npcs=5):
   n = len(sample_list)
   p = len(locus_list)
   gen_mat = np.empty((n, p), dtype=np.float32)
-  
+
   loc = 0
   for i, row in enumerate(plinkpca):
     arr = np.fromiter(row, dtype=np.float32)
     arr[arr==3] = np.nan
     sd = np.nanstd(arr)
     mu = np.nanmean(arr)
-    arr -= mu 
+    arr -= mu
     arr[np.isnan(arr)] = 0
     arr /= sd
     gen_mat[:,loc] = arr#np.fromiter(row, dtype=np.float32)
@@ -119,14 +119,14 @@ def run_gwas(imputed, toPCA, out, npcs=5):
 
   pca = decomp.PCA()
   U, S, V = pca._fit_truncated(gen_mat, n_components=npcs, svd_solver='arpack')
-  
+
   np.savetxt(out+'.V.txt',V)
   np.savetxt(out+'.U.txt',U)
   np.savetxt(out+'.sigma.txt',S)
   np.savetxt(out+'.ids.txt', ids, fmt='%i')
   with open(out+'.countries', 'w') as f:
     f.write("\n".join(demography))
-  
+
   #del S, V, gen_mat
   U_id_dict = dict((key, value) for (key, value) in zip(ids, U[:,:npcs]))
   run_regressions(imputed, U_id_dict, out+'betas.txt', npcs)
@@ -152,8 +152,8 @@ def run_regressions(plink_file, U_dict, out_file, npcs, buf=100 ):
   X[:,1:] = [U_dict[int(sample.iid)] for sample in sample_list]
   X[:,1:] /= np.std(X[:,1:], axis = 0)
   covp = X.shape[1]
-  
-  # High C corresponds to less regularization. 
+
+  # High C corresponds to less regularization.
   model = LogisticRegression(fit_intercept=False,  tol=1e-5, C=1e4)
   k = 0
   # fit nuisance
@@ -182,14 +182,14 @@ def run_regressions(plink_file, U_dict, out_file, npcs, buf=100 ):
         covLogit = np.linalg.inv(X_design.T * V * X_design)
         coefs = np.array(model.coef_)#np.insert(model.coef_, 0, model.intercept_)
         z = (coefs / np.sqrt(np.diag(covLogit))) ** 2
-        # Chi-squared test 
+        # Chi-squared test
         l_fit = log_loss(y, y_model, normalize=False)
         D = l_fit - l_null
         p = chi2.sf(z, 1)
         betas[i, :covp] = coefs
         betas[i, covp:2*covp] = p
         betas[i, 2*covp] = D
-      else: 
+      else:
         betas[i,:] = np.nan
       betas[i, 2*covp+1] = locus.chromosome
       i += 1
@@ -210,7 +210,7 @@ if __name__=='__main__':
   scratch_path_fam = os.path.join(SCRATCH, basename+".fam")
   scratch_path_bed = os.path.join(SCRATCH, basename+".bed")
   scratch_path_bim = os.path.join(SCRATCH, basename+".bim")
-  
+
   copyfile(os.path.join('data', basename+".fam"), scratch_path_fam)
   copyfile(os.path.join('data', basename+".bed"), scratch_path_bed)
   copyfile(os.path.join('data', basename+".bim"), scratch_path_bim)
@@ -236,7 +236,7 @@ if __name__=='__main__':
   logger.info("Running Centralized GWAS")
   run_gwas(sim_scratch_path, pca_file_path, sim_out)
   logger.info("Exiting")
-  # Copy all generated files back 
+  # Copy all generated files back
   for filename in glob.glob(sim_out+'*'):
     copy(filename, ".")
 

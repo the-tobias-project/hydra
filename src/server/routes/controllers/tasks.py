@@ -46,7 +46,7 @@ def start_task(task_name):
                 task_pca.start_pca_filters(args)
             else:
                 logging.info("Reporting Filtered Sites")
-                task_pca.report_pos()
+                task_pca.Position_reporter.get_instance().report_pos()
         else:
             logging.info("starting eigen decomposition")
             task_pca.eigenDecompose(n_components=10)
@@ -91,8 +91,7 @@ def start_subtask(task_name, subtask_name, client_name):
             ld_agg = task_pca.CovarianceAggregator.get_instance(len(Registry.get_instance().list_clients()), 50)
             ld_agg.update(request.data)
         elif subtask_name == "PCAPOS":
-            reporter = task_pca.Position_reporter()
-            reporter.report_pos()
+            task_pca.Position_reporter.get_instance().report_pos()
         elif subtask_name == "COV":
             task_pca.store_covariance(client_name, request.data)
 

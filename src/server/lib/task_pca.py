@@ -144,15 +144,22 @@ class CovarianceAggregator(object):
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
 #            self.tqdm.update(self.r2)
 
-
 class Position_reporter(object):
     __instance = None
 
     def __init__(self):
-        if CovarianceAggregator.__instance is not None:
+        if Position_reporter.__instance is not None:
             return
         else:
             self.incrementor = len(clients)
+            Position_reporter.__instance = self
+
+    @staticmethod
+    def get_instance():##TODO this is dangerous. If num_clients or win_size changes
+        if Position_reporter.__instance is None:
+            Position_reporter()
+        return Position_reporter.__instance
+
     def report_pos(self):
         if self.incrementor > 1:
             self.incrementor -= 1
@@ -209,6 +216,7 @@ def store_covariance(client_name, data):
     logging.info(cov_name)
     if "E" in msg:
         logging.info("Finished storing covariances")
+        eigenDecompose(n_components=10)
 
 
 def eigenDecompose(n_components=10):
