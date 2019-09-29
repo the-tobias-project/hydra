@@ -113,7 +113,7 @@ def data_adjust():
     logging.info('Covariate update')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.adjust',
-                            [request.data, app.config['client']],
+                            [request.data, app.config['client'], app.config["ENV"]],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
@@ -124,7 +124,7 @@ def lr_init():
     logging.info('Initializing Regression')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.regression_init',
-                            [app.config['client']],
+                            [app.config['client'], app.config['ENV']],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)

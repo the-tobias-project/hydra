@@ -106,8 +106,8 @@ def pca_projection(data, client_config):
 
 
 @celery.task(name='tasks.regression_init')
-def initialize_logistic_reg(client_config):
-    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config)
+def initialize_logistic_reg(client_config, env):
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
 
 
 @celery.task(name='tasks.asso')
@@ -118,9 +118,9 @@ def compute_logistic_reg(message, client_config):
 
 
 @celery.task(name='tasks.adjust')
-def adjust_covariates(message, client_config):
+def adjust_covariates(message, client_config, env):
     print("adjusting covariates")
-    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config)
+    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
     lr_agg.global_standardize(message, client_config)
 
 

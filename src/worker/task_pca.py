@@ -30,8 +30,6 @@ class LdReporter(object):
             self.chroms = [key for key, items in self.store.items() if key != "meta"]
             LdReporter.__instance = self
 
-            print("initiated")
-
     @staticmethod
     def get_instance(win_size, client_config):
         if LdReporter.__instance is None:
@@ -58,6 +56,7 @@ class LdReporter(object):
                     msg = pickle.dumps({})
                     networking.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
                                                  client_config['name'], env)
+                    self.store.close()
                     print("Done with LD pruning")
                     return
                 continue
@@ -150,13 +149,12 @@ def pca_projection(data, client_config):
     chroms = message["CHROMS"]
     pfile = shared.get_plink_store(client_config["plinkfile"])
     with h5py.File(pfile, 'a') as store:
-        dset = store["meta"]
-        pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
-        pca_sigma[:] = inv_sigma
         n = 0
         for chrom in chroms:
             n += np.sum(store[f"{chrom}/PCA_mask"])
         num_inds = store.attrs["n"]
+        #pca_sigma = dset.require_dataset('pca_sigma', shape=inv_sigma.shape, dtype=np.float32)
+        #pca_sigma[:] = inv_sigma
         arr = np.empty((num_inds, n), dtype=np.float32)
         offset = 0
         for chrom in chroms:
@@ -172,10 +170,14 @@ def pca_projection(data, client_config):
             offset += i+1
         u = arr.dot(v.T).dot(np.diag(inv_sigma))
         u, v = svd_flip(u, v, u_based_decision=False)
-        pca_vt = dset.require_dataset('pca_v.T', shape=v.shape,
-            dtype=np.float32)
-        pca_vt[:,:] = v
-        pca_u = dset.require_dataset('pca_u', shape=u.shape,
-            dtype=np.float32)
-        pca_u[:,:] = u
-        print("Done with projection!")
+        dset = store.create_group("pca")
+        dset.create_dataset('pca_sigma', data=inv_sigma)
+        dset.create_dataset('pca_v.T', data=v)
+        dset.create_dataset('pca_u', data=u)
+        #pca_vt = dset.require_dataset('pca_v.T', shape=v.shape,
+        #    dtype=np.float32)
+        #pca_vt[:,:] = v
+        #pca_u = dset.require_dataset('pca_u', shape=u.shape,
+        #    dtype=np.float32)
+        #pca_u[:,:] = u
+    print("Done with projection!")
