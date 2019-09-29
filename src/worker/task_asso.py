@@ -1,29 +1,26 @@
 # stdlib
-import os
 import pickle
-import sys
 import time
 
 # third party lib
 import h5py
 import numpy as np
-from plinkio import plinkfile
 from sklearn.metrics import log_loss
 
 # internal lib
 from client.lib import shared
 from lib import networking
 from lib.utils import write_or_replace
-from lib.optimizationAux import *
+from lib.optimizationAux import other_newton, ltri_Hessians, function_values
 from lib.opt import minimize_lbfgs
 
-#TODO clean up Us etc 
+#TODO clean up Us etc
 
 class LogisticAdmm(object):
     __instance = None
-    def __init__(self, covar_numbers, npcs, client_config, threshold=.005):
+    def __init__(self, covar_numbers, npcs, client_config, env, threshold=.005):
         if LogisticAdmm.__instance is not None:
-            return 
+            return
         else:
             pfile = client_config["plinkfile"]
             store_name = shared.get_plink_store(pfile)
@@ -31,6 +28,7 @@ class LogisticAdmm(object):
             self.threshold = threshold
             self.client_config = client_config
             self.include_mask = []
+            self.env = env
             self.load_Y(covar_numbers[-1], pfile)
             self.load_covar_mat(npcs, covar_numbers[:-1], pfile)
             self.warm_start = 0
@@ -42,11 +40,11 @@ class LogisticAdmm(object):
             LogisticAdmm.__instance = self
 
     @staticmethod
-    def get_instance(covar_numbers, npcs, client_config):
+    def get_instance(covar_numbers, npcs, client_config, env="production"):
         if LogisticAdmm.__instance is None:
-            LogisticAdmm(covar_numbers, npcs, client_config)
+            LogisticAdmm(covar_numbers, npcs, client_config, env)
         return LogisticAdmm.__instance
-    
+
     def load_Y(self, index, fname):
         name = shared.get_covar_file(fname)
         y = np.loadtxt(name, usecols=[index], delimiter='\t', skiprows=1)
@@ -66,25 +64,27 @@ class LogisticAdmm(object):
         #if self.threshold is None: #TODO determine this based on entire sample size
         #    self.threshold = 3*float(p)/n   # Don't run regression unless you have at least this AF
         self.covariates = np.empty((n, p))
-        # Load up scores 
-        self.covariates[:, 2:npcs+2] = store["meta/pca_u"].value[include_mask,:npcs]
+        # Load up scores
+        self.covariates[:, 2:npcs+2] = store["pca/pca_u"].value[include_mask,:npcs]
         covar_file_name = shared.get_covar_file(fname)
         other_covars = np.loadtxt(covar_file_name, delimiter="\t", usecols=other_covars_loc,
             skiprows=1)
+        if other_covars.ndim == 1:
+            other_covars = np.expand_dims(other_covars, axis=1)
         self.covariates[:, npcs+2:] = other_covars[include_mask, :]
         self.covariates[:, 0] = 1
         other_covars = self.send_summary_to_standardize()
-        
+
         #other_covars /= np.std(other_covars, axis = 0)  # This needs to be the global std
         #other_covars -= np.mean(other_covars, axis = 0)  # This needs to be the global std
         #self.covariates[:, 0] = -self.Ys.reshape(-1)
         #self.flipped_covar = True
-    
+
     def send_summary_to_standardize(self):
-        # This is a rough sketch, the assumption here is that if you are quantitative factor, then you 
+        # This is a rough sketch, the assumption here is that if you are quantitative factor, then you
         # exhibit more than 2 values within each silo. I never actually verify this with the current version
-        # So that might be a good TODO for future implementations. 
-        quant_covars = [ i for i in range(2,self.covariates.shape[1]) if 
+        # So that might be a good TODO for future implementations.
+        quant_covars = [ i for i in range(2,self.covariates.shape[1]) if
             len(np.unique(self.covariates[:,i])) > 2 ]
         sums = np.sum(self.covariates[:,quant_covars], axis = 0)
         sumsq = np.sum(self.covariates[:,quant_covars]**2, axis=0)
@@ -93,7 +93,7 @@ class LogisticAdmm(object):
             }
         msg = pickle.dumps(msg)
         networking.respond_to_server('api/tasks/ASSO/adjust', 'POST', msg,
-                                     self.client_config['name'])
+                                     self.client_config['name'], self.env)
 
     def global_standardize(self, data, client_config):
         data = pickle.loads(data)
@@ -158,7 +158,7 @@ class LogisticAdmm(object):
         est = z_hat+all_Us
         msg = pickle.dumps({"VALS": est, "Estimated":"Small"})
         networking.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
-                                     self.client_config['name'])
+                                     self.client_config['name'], self.env)
 
     def run_newton_lr(self, y, chrom=None, warm_start=None, unconverged=None):
         store = self.store
@@ -170,9 +170,9 @@ class LogisticAdmm(object):
         group = store[chrom]
         af = group["MAF"]
         positions = group["positions"]
-        ncov = self.covariates.shape[1] 
+        ncov = self.covariates.shape[1]
         baselikelihood = self.baseline_likelihood[chrom]
-        if unconverged is None: 
+        if unconverged is None:
             L = len(positions)
         else:
             L = np.sum(unconverged)
@@ -192,10 +192,8 @@ class LogisticAdmm(object):
           #      print(f"Average time is {totalT} for n={n}, {t2/500}")
           #      print(f"Count is {count}")
           #      break
-            if not i % 1000:
-                print(f"{time.time()-t}")
-                t = time.time()
-                print (float(i/L))
+            if not i % 5000:
+                print(f"{time.time()-t} Done with {float(i/L)}")
             if af[i] < self.threshold or (1-af[i]) < self.threshold:
                 continue
             val = group[str(position)].value[include_mask]
@@ -217,7 +215,7 @@ class LogisticAdmm(object):
         msg = pickle.dumps({"Estimated": chrom, "H": hessians, 'g':gradients,
           'd': diagonals, 'v': vals, "covar": covariates})
         networking.respond_to_server('api/tasks/ASSO/hessians', 'POST', msg,
-                                     self.client_config['name'])
+                                     self.client_config['name'], self.env)
 
     def cost(self, data):
         msg = pickle.loads(data)
@@ -228,7 +226,7 @@ class LogisticAdmm(object):
         estimates -= self.baseline_likelihood[chrom][mask[:,0]]
         msg = pickle.dumps({'estimated': chrom, 'v': estimates})
         networking.respond_to_server('api/tasks/ASSO/valback', 'POST', msg,
-                                     self.client_config['name'])
+                                     self.client_config['name'], self.env)
 
     def evaluate_estimate(self, chrom, mask, x0, exclude=None):
         store = self.store
@@ -276,7 +274,7 @@ class LogisticAdmm(object):
         covariates = self.covariates.copy()
         group = store[chrom]
         positions = group["positions"]
-        ncov = self.covariates.shape[1] 
+        ncov = self.covariates.shape[1]
         estimates = np.zeros((len(positions), ncov))
         if warm_start is None:
             est = np.zeros(ncov)
@@ -294,6 +292,7 @@ class LogisticAdmm(object):
             all_Us[0] = self.previous_Us["Small"][0]
             all_Us[2:] = self.previous_Us["Small"][1:].ravel()
         count = 0
+        t = time.time()
         for i, position in enumerate(positions):
           #  if i == 10: #TODO
           #      totalT = (time.time()-t)/500
@@ -337,10 +336,10 @@ class LogisticAdmm(object):
                     z_hat = alpha * estimates + (1-alpha) * warm_start
               #  t2 += time.time()-t3
         self.previous_estimates[chrom] = estimates
-        self.previous_Us[chrom] = all_Us 
+        self.previous_Us[chrom] = all_Us
         msg = pickle.dumps({"Estimated": chrom, "VALS": z_hat + all_Us})#, 'cov': covariates})
         networking.respond_to_server('api/tasks/ASSO/estimate', 'POST', msg,
-                                     self.client_config['name'])
+                                     self.client_config['name'], self.env)
 
 
     def send_likelihood(self, message):
@@ -376,7 +375,7 @@ class LogisticAdmm(object):
                     ell[0,i] = np.nan
                 else:
                     val = group[str(position)].value[include_mask]
-                    ind = ~ np.isnan(val) #TODO impute or something? 
+                    ind = ~ np.isnan(val) #TODO impute or something?
                     covariates[:,1] = val
                     y_model = 1.0 / (1 + np.exp(-covariates[ind, :].dot(coef[:,i].T)))
                     ell[0,i] = log_loss(y[ind], y_model, normalize=False, labels=[0,1])
@@ -384,4 +383,4 @@ class LogisticAdmm(object):
 
         msg = pickle.dumps({"Estimated": model, "estimate": ell})
         networking.respond_to_server('api/tasks/ASSO/pval', 'POST', msg,
-                                     self.client_config['name'])
+                                     self.client_config['name'], self.env)

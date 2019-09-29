@@ -171,6 +171,7 @@ class Position_reporter(object):
                     data[chrom] = store[f"{chrom}/PCA_passed"].value
                     msg = pickle.dumps(data)
                     networking.message_clients("pca/pcapos", data=msg, env=app.config["ENV"])
+            self.incrementor = len(clients)
             time.sleep(ServerHTTP.wait_time) #TODO fix this hack. Give time for clients to finish
             networking.message_clients("pca/cov", data=msg, env=app.config["ENV"])
 
@@ -216,7 +217,10 @@ def store_covariance(client_name, data):
     logging.info(cov_name)
     if "E" in msg:
         logging.info("Finished storing covariances")
-        eigenDecompose(n_components=10)
+        if Position_reporter.get_instance().incrementor == 1:
+            eigenDecompose(n_components=10)
+        else:
+            Position_reporter.get_instance().incrementor -= 1
 
 
 def eigenDecompose(n_components=10):
