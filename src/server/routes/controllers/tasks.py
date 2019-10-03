@@ -1,6 +1,7 @@
 # stdlib
 import logging
 import time
+import ast
 
 # third party lib
 from flask import request
@@ -8,9 +9,10 @@ from flask import request
 # internal lib
 from lib import tasks
 from lib import networking
-from lib.settings import Commands, Options
+from lib.settings import Commands, Options, Thresholds
 from server.lib import task_init, task_qc, task_pca, task_ass
 from lib.client_registry import Registry
+
 
 
 def list_tasks():
@@ -22,10 +24,8 @@ def start_task(task_name):
     logging.info(f'Got command to start {task_name}, starting...')
 
     args = {}
-    for key in request.args.keys():
-        if key.startswith('p_'):
-            k = key[2:]
-            args[k.upper()] = request.args[key]
+    for key, val in request.json.items():
+        args[key.upper()] = val
 
     if task_name == Commands.INIT:
         task_init.start_init_task()
@@ -39,9 +39,9 @@ def start_task(task_name):
         if not task_pca.ready_to_decompose():
             if not task_pca.filtered():
                 if Options.MAF not in args:  # default parameters
-                    args[Options.MAF] = '0.1'
+                    args[Options.MAF] = Thresholds.PCA_maf
                 if Options.LD not in args:  # default parameters
-                    args[Options.LD] = ['50', '0.2']
+                    args[Options.LD] = [Thresholds.PCA_ld_window, Thresholds.PCA_ld_threshold]
                 logging.info(f"Specified pruning filters :{args}")
                 task_pca.start_pca_filters(args)
             else:
@@ -60,11 +60,11 @@ def start_task(task_name):
 def start_subtask(task_name, subtask_name, client_name):
     logging.info(f'Got task {task_name}/{subtask_name}')
 
-    args = {}
-    for key in request.args.keys():
-        if key.startswith('p_'):
-            args[key] = request.args[key]
-
+#    args = {}
+#    for key in request.args.keys():
+#        if key.startswith('p_'):
+#            args[key] = request.args[key]
+#
     if task_name == Commands.INIT:
         if subtask_name == 'POS':
             logging.info(f'Got POS response from {client_name}')

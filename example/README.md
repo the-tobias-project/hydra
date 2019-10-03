@@ -4,14 +4,14 @@ In this example, we use HYDRA to run a GWAS on 1K Genome data split between 3 si
 
 ## Data
 
-Create the `testData` subdirectory (`mkdir testData`). Download the Center specific [data](https://console.cloud.google.com/storage/browser/hydra-example-data) and unzip the folders in `testData`. Download the compiled files (ending with .so) and place them in the src/lib folder.
+Download [`testData.zip`](https://console.cloud.google.com/storage/browser/hydra-example-data) and unzip the folders in the `example` directory. Download the compiled files (ending with .so) and place them in the `src/lib` folder.
 
-You can generate the test dataset using `download1kG.sh` after setting up the container using the following command
+If you'd like, you can generate the test dataset using `download1kG.sh` after setting up the container. This is discourages since it involves changing WGS vcf files to plink format and may take a long time. Nevertheless, you can do this using the following command
 
 ```bash 
 docker exec -it hydra_app_1 "download1kG.sh"
 ```
-Note that processing the whole genome files is slow. You can also use your own data by simply splitting the plink files and placing them in the corresponding data folders.
+If you have downloaded the data, you can ignore that step. You can also use your own data by simply splitting the plink files and placing them in the corresponding data folders.
 
 ## Container setup. 
 
@@ -54,7 +54,7 @@ bash-3.2$ docker attach Center1
 If you'd like to pull the containers from the hub, you can use the command: 
 
 ```bash
-docker network create reids-network
+docker network create redis-network
 docker run --name Center1 --expose 9001 --hostname hydra -it --network=hydra-network --network-alias=hydra_network --rm  apoursh/hydra:0.1 bash
 ```
 
@@ -70,8 +70,8 @@ You should see a confirmation of registration on the client side and the server 
 The last step in the setup is starting up the workers. We need to connect to each container and run a separate worker. 
 
 ```bash
-root@hydradocker exec -it Center1 "bash"
-root@hydra-client:/app# cd src/
+root@hydra-client: docker exec -it Center1 "bash"
+root@hydra-client: /app# cd src/
 C_FORCE_ROOT=1  celery -A celery_worker.celery worker -Q Center1 -n Center1 --concurrency=1
 ```
 

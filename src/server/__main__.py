@@ -77,7 +77,6 @@ def load_schemas():
         current_app.schema_info['message'] = str(e)
         return False
 
-
 def main():
     args = parse_args()
     server = {

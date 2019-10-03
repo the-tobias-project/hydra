@@ -7,10 +7,10 @@ info:
     name: MIT
 basePath: "/api"
 tags:
-  - name: client
-    description: A HYDRA client
-  - name: tasks
-    description: tasks for the server to run and broadcast
+  - name: Clients
+    description: Client management tools
+  - name: Jobs
+    description: Tasks for the server to run and broadcast
 consumes:
   - application/json
 produces:
@@ -22,7 +22,7 @@ paths:
   /clients:
     get:
       tags:
-        - client
+        - Clients
       summary: Get a listing of all registered clients
       operationId: server.routes.controllers.clients.lst_clients
       responses:
@@ -30,7 +30,7 @@ paths:
           description: A listing of registered clients was returned
     post:
       tags:
-        - client
+        - Clients
       summary: Add a client to the registry
       operationId: server.routes.controllers.clients.add_client
       parameters:
@@ -46,7 +46,7 @@ paths:
   /clients/{client_name}:
     delete:
       tags:
-        - client
+        - Clients
       summary: Given a client name, remove it from the registry
       operationId: server.routes.controllers.clients.remove_client
       parameters:
@@ -60,8 +60,8 @@ paths:
   /clients/{client_name}/report:
     post:
       tags:
-        - client
-      summary: Clients report back their status here.  Used to let humans know when something is done.
+        - Clients
+      summary: Clients report back their status here.  Used to let the analyst know when something is done.
       operationId: server.routes.controllers.clients.report_status
       parameters:
         - name: client_name
@@ -79,7 +79,7 @@ paths:
   /tasks:
     get:
       tags:
-        - tasks
+        - Jobs
       summary: Get a list of available tasks
       operationId: server.routes.controllers.tasks.list_tasks
       responses:
@@ -88,7 +88,7 @@ paths:
   /tasks/{task_name}:
     post:
       tags:
-        - tasks
+        - Jobs
       summary: Start a given task
       operationId: server.routes.controllers.tasks.start_task
       parameters:
@@ -101,13 +101,21 @@ paths:
             - QC
             - PCA
             - ASSO
+        - name: thresholds
+          in: body
+          description: "Use this field to specify thresholds and other parameters. WARNING: Just because you 
+          havent' specified a threshold, doesn't mean the filter isn't happening. Checkout the defaults." 
+          required: false
+          schema:
+            type: object
+            additionalProperties: true
       responses:
         200:
           description: Successfully started task
   /tasks/{task_name}/{subtask_name}:
     post:
       tags:
-        - tasks
+        - Jobs
       summary: Start a given subtask
       operationId: server.routes.controllers.tasks.start_subtask
       parameters:

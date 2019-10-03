@@ -24,6 +24,7 @@ class Commands(object):
     ASSO = "ASSO"
     EXIT = "EXIT"
     all_commands = [HELP, INIT, QC, PCA, ASSO, EXIT]  # used by v.1 interface
+    commands_with_parms = [QC, PCA, ASSO]
 
 
 class Options(object):

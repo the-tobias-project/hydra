@@ -1,11 +1,16 @@
 # HYDRA
-Decentralized GWAS
+Software for decentralized GWAS
+
+## Tutorial  
+
+The easiest way to familiarize yourself with the pipeline is following this short [example](https://github.com/apoursh/HYDRA/tree/master/example) file. The example will walk through the setup and a mock GWAS using publicly available 1K genomes data.
+
 
 ## Setup
 
 The recommended setup requires the following:
 
-* Docker
+* Docker (Version 2.0 or above)
 * Bash
 * An internet connection
 * The two ports `[9001, 9200]` open on your computer
@@ -18,43 +23,36 @@ the docker hub:
 
 Server side: 
 1. `docker pull apoursh/hydra:0.1`
-2. `docker network create hydra-network`
-3. `docker run --name hydra -p 9001:9001 --hostname hydra -it apoursh/hydra:0.1 bash`
+2. `docker run --name hydra -p 9001:9001 --hostname hydra -it apoursh/hydra:0.1 bash`
 
 
-After running step 3, you should find yourself inside the docker container with a prompt that looks
-like this:
+You should find yourself inside the docker container with a prompt that looks like this:
 
 ```bash
 root@hydra:/app#
 ```
-On the client side, you will also need to run: `docker network create hydra-redis`
+On the client side, you will need to start a redis network: `docker network create hydra-redis`
 
 ### Build the image yourself
 
-To run the setup first download the binary files (ending with `.so`) from [here](https://console.cloud.google.com/storage/browser/hydra-example-data). Then navigate to this directory and run the following:
+Instead of downloading the image, you can build the image from scratch. To run the setup first download the binary files (ending with `.so`) from [here](https://console.cloud.google.com/storage/browser/hydra-example-data). Then navigate to the software-home directory and run the following:
 
 `bash up.sh`
 
 (or, if the executable bit is active, `./up.sh`)
 
-This will build your image to include all necessary libraries and runtime requirements. Once the `up.sh` script has completed, you should find yourself inside the docker container with a prompt that looks
-like this:
+This will build your image to include all necessary libraries and runtime requirements. Once the `up.sh` script has completed, you should find yourself inside the docker container with a prompt that looks like this:
 
 ```bash
 root@hydra:/app#
 ```
 
-Additionally, if you run `docker ps`from the host machine, you should see two new containers currently running - one
+Note that this step is the same for all users (server and centers). Additionally, if you run `docker ps`from the host machine, you should see two new containers currently running - one
 for HYDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HYDRA (e.g. `hydra_redis_1`). 
     
-We use Celery to manage client jobs, and Celery uses Redis as its' communication backbone.
+We use Celery to manage client jobs, and Celery uses Redis as its communication backbone.
 
 To run the experiments on your dataset, please follow the directions under [data prep](#data-prep-details)
-
-## Tutorial  
-
-The easiest way to familiarize yourself with the pipeline is following the short tutorial in the [example](tree/master/example) file. In this short tutorial, we run a mock GWAS using publicly available 1K genomes data.
 
 
 ## Running the server, client(s), and worker(s)
@@ -306,8 +304,13 @@ server, which will again show up in the server logs.
 1.  Issues with opening or creating a file
 
     This can happen if you attempt to run initialization a second time without first clearing
-    the scratch directory.  Try shutting down the server and all clients, clearing the scratch
-    directory, then starting them up again.
+    the scratch directory or if the program exists unexpectedly. If you would like to re-initialize 
+    the experiment, try shutting down the server, all clients and workers. Then remove the 
+    scratch directory, and restart.
+
+    If the process was unexpectedly stopped and exited, you can clear the file pointer flag using 
+    `h5clear -s scratch/filename.h5py`.
+
 
 <!---
 1.  Issues with `lib.corr`
