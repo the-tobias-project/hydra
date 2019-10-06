@@ -13,6 +13,7 @@ from flask import current_app as app
 from lib.settings import Settings, Options, Commands
 from lib.client_registry import Registry
 from lib import networking
+from server.lib import task_init
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
@@ -120,5 +121,6 @@ def filter_finished(client_name, state):
     Registry.get_instance().set_client_state(client_name, "Filterd")
     if not Registry.get_instance().num_clients_in_state(state):
         logging.info(f"Done with filtering in {Commands.QC} stage")
+        task_init.make_plots("QC_post_filter.png")
         return True
     return False

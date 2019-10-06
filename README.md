@@ -311,6 +311,13 @@ server, which will again show up in the server logs.
     If the process was unexpectedly stopped and exited, you can clear the file pointer flag using 
     `h5clear -s scratch/filename.h5py`.
 
+## Other resources 
+
+Note that while we only transfer aggregate data, we do this multiple times as a result, just like 
+publication of summary statistics for meta-analysis (and even more so), this work is susceptible to
+Homer-like attacks by the server. If the server cannot be trusted encryption based methods such as 
+[this work](https://github.com/hhcho/secure-gwas) are more appropriate. 
+
 
 <!---
 1.  Issues with `lib.corr`

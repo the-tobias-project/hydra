@@ -31,7 +31,7 @@ class Thresholds(object):
     QC_hwe = 1e-10
     PCA_maf = 0.1
     PCA_ld_window = 50
-    PCA_ld_thresh = 0.2
+    PCA_ld_threshold = 0.2
 
 class Options(object):
     # HELP = Commands.HELP

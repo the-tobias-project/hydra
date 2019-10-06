@@ -10,6 +10,7 @@ numba==0.40.0
 numpy==1.15.2
 pandas==0.24.1
 plinkio==0.9.6
+kombu==4.5.0
 redis==3.2.1
 requests==2.20.1
 scipy==1.1.0

@@ -17,6 +17,9 @@ from lib.settings import Settings, Options, PCAFilterNames, Commands
 from lib.client_registry import Registry
 from lib.utils import write_or_replace
 import lib.networking as networking
+from server.lib.plots import manhattan_plot
+import pdb
+
 
 #from  sklearn.linear_model import LogisticRegression as lr
 
@@ -37,7 +40,6 @@ class LogisticAdmm(object):
             self.estimates = {}
             self.iters, self.accumulant = {}, {}
             self.chroms = [v for v in store.keys() if v != 'meta']
-            #self.chroms = ["21"]
             self.active_chroms = ["Small"]
             self.finished = {}
             self.likelihood = {}
@@ -322,9 +324,13 @@ class LogisticAdmm(object):
                 if self.finished[model]:
                     write_or_replace(store, f"meta/{model}/newton_ell",
                         self.scratch_likelihoods[model])
+                    write_or_replace(store, f"meta/{model}/newton_pval",
+                        chi2sf(-2*self.scratch_likelihoods[model],1))
                     del self.scratch_likelihoods[model]
                     del self.Hess[model], self.Gradients[model]
                     del self.Diags[model], self.fchanges[model]
+                    if all(value for value in self.finished.values()):
+                        manhattan_plot(storePath, "manhattan_plot.png")
                 else:
                     self.newton_test_new_point(model)
         else:
@@ -375,7 +381,6 @@ class LogisticAdmm(object):
 
     def initialize_pval_computation(self):
         self.chroms = set([v for v in store.keys() if v != 'meta'])
-        #self.chroms = ["21", "22"]
         self.send_coef("Small", {})
 
     def send_coef(self, model, msg):

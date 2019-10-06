@@ -14,6 +14,7 @@ from lib.corr import hweP
 from lib.settings import Settings, Commands
 from lib.utils import write_or_replace
 from lib.client_registry import Registry
+from server.lib import plots
 
 
 
@@ -22,6 +23,8 @@ store = h5py.File(storePath, "a")
 
 
 def start_init_task():
+    for client in Registry.get_instance().list_clients():
+        Registry.get_instance().set_client_state(client['name'], Commands.INIT)
     networking.message_clients("init", env=app.config["ENV"])
 
 
@@ -32,7 +35,6 @@ def store_positions(data):
     dsetname = "{}/positions".format(chrom)
     write_or_replace(store, dsetname, positions, np.uint32)
     logging.info("{} loci in chromosome {}.".format(len(positions), chrom))
-
 
 def store_counts(data, client_name):
     message = pickle.loads(data)
@@ -54,7 +56,7 @@ def store_counts(data, client_name):
         np.int64)
     dset[:] += np.hstack((homo_ref, counts))
     if "END" in message:
-        Registry.get_instance().set_client_state(client_name, 'INIT_DONE')
+        Registry.get_instance().set_client_state(client_name, Commands.INIT_STATS)
         if Registry.get_instance().num_clients_in_state(Commands.INIT) == 0:
             logging.info('Done getting init reports from clients')
             logging.info('Telling clients to store stats')
@@ -68,8 +70,7 @@ def count_stats():
     for chrom in store.keys():
         counts_dset = store["{}/counts".format(chrom)].value
         missing_rate = counts_dset[:, 3] / float(N)
-        missing_rate_dset = store.create_dataset(
-            "{}/missing_rates".format(chrom), data=missing_rate)
+        store.create_dataset(f"{chrom}/missing_rates", data=missing_rate)
         af = (counts_dset[:, 2] * 2 + counts_dset[:, 1]).astype(float)
         af /= (np.sum(counts_dset[:, :3], axis=1) * 2).astype(float)
         # af = np.minimum(af, 1-af)
@@ -93,7 +94,13 @@ def count_stats():
         }
         msg = pickle.dumps(msg)
         networking.message_clients("init/stats", env=app.config["ENV"], data=msg)
-        for client in clients:
-            Registry.get_instance().set_client_state(client['name'], Commands.INIT_STATS)
+        store.create_dataset("{}/hwe".format(chrom), data=hwe)
+    for client in clients:
+        Registry.get_instance().set_client_state(client['name'], "DONE_INIT")
 
-        hwe_dset = store.create_dataset("{}/hwe".format(chrom), data=hwe)
+    logging.info("Done with initialization")
+    make_plots("QC_pre_filter.png")
+
+def make_plots(outname):
+      logging.info("Generating QC plots")
+      plots.qc_plots(storePath, outname)
