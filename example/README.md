@@ -42,7 +42,7 @@ root@hydra:/app/src# python -m server --dev 1
  * Debug mode: off
    [INFO ] 2019-09-24 04:52:39,895 /usr/local/lib/python3.6/site-packages/werkzeug/_internal.py                     :: 122 =>  * Running on http://0.0.0.0:9001/ (Press CTRL+C to quit)
 ```
-Head over to `http://localhost:9001/api/ui/` in a browser to monitor and control the server.
+Head over to `http://localhost:9001/api/ui/` in a browser to monitor and control the server. You should see a page similar to the one in Figure 1 below. 
 
 
 Next, we will setup all the clients. If `up.sh` was used, these containers have been made and started already so simply attach to each center and run the client...
@@ -80,7 +80,16 @@ Change "Center1" as appropriate for each container.
 
 ## GWAS
 
-Now we are ready to run a GWAS. This can be done through the UI or using `curl` commands. In the UI, click on "tasks->/tasks/{task_name}". Select "INIT" from the drop-down list of task_names and press "Try it out!". You should see a confirmation of this command on the server side and soon after on the client side. The worker will provide periodic updates as it works through the initialization steps. Once the process is over follow up with QC, PCA and ASSO in the same way. 
+Now we are ready to run a GWAS. This can be done through the UI or using `curl` commands. In the UI, click on "Jobs->/tasks/{task_name}" (see Figure 1).
 
+![UI]()
 
+Select "INIT" from the drop-down list of task_names and press "Try it out!" (see Figure 2).
 
+![Starting]()
+
+You should see a confirmation of this command on the server side and soon after on the client side. The worker will provide periodic updates as it works through the initialization steps. Once the process is over you should see an automatically generated figure `QC_pre_filter.png` that can be helpful for filteration (figure 3, left). Proceed by running QC in the same way. You should see a similar post-QC image `QC_post_filter.png`.
+
+![]()
+
+Finally you can proceed with PCA and ASSO.
