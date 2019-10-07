@@ -82,14 +82,17 @@ Change "Center1" as appropriate for each container.
 
 Now we are ready to run a GWAS. This can be done through the UI or using `curl` commands. In the UI, click on "Jobs->/tasks/{task_name}" (see Figure 1).
 
-![UI]()
+![UI](https://github.com/apoursh/HYDRA/blob/master/example/figures/Starter_image.png)
 
 Select "INIT" from the drop-down list of task_names and press "Try it out!" (see Figure 2).
 
-![Starting]()
+![Starting](https://github.com/apoursh/HYDRA/blob/master/example/figures/Tasks.png)
 
 You should see a confirmation of this command on the server side and soon after on the client side. The worker will provide periodic updates as it works through the initialization steps. Once the process is over you should see an automatically generated figure `QC_pre_filter.png` that can be helpful for filteration (figure 3, left). Proceed by running QC in the same way. You should see a similar post-QC image `QC_post_filter.png`.
 
-![]()
+![QC](https://github.com/apoursh/HYDRA/blob/master/example/figures/QC.png)
 
 Finally you can proceed with PCA and ASSO.
+
+
+![Manhattan](https://github.com/apoursh/HYDRA/blob/master/example/figures/manhattan_plot.png)
