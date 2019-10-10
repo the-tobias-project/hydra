@@ -80,9 +80,9 @@ class LogisticAdmm(object):
         self.send_request(msg, "estimate")
 
     @staticmethod
-    def get_instance(npcs, active):
+    def get_instance(args, active):
         if LogisticAdmm.__instance is None:
-            LogisticAdmm(npcs, active)
+            LogisticAdmm(args["ASSO_PCS"], active)
         return LogisticAdmm.__instance
 
     def update_stats(self, data):
