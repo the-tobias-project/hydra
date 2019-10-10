@@ -147,17 +147,18 @@ class CovarianceAggregator(object):
 class Position_reporter(object):
     __instance = None
 
-    def __init__(self):
+    def __init__(self, args):
         if Position_reporter.__instance is not None:
             return
         else:
             self.incrementor = len(clients)
+            self.args = args
             Position_reporter.__instance = self
 
     @staticmethod
-    def get_instance():##TODO this is dangerous. If num_clients or win_size changes
+    def get_instance(args={}):##TODO this is dangerous. If num_clients or win_size changes
         if Position_reporter.__instance is None:
-            Position_reporter()
+            Position_reporter(args)
         return Position_reporter.__instance
 
     def report_pos(self):
@@ -198,13 +199,6 @@ def store_covariance(client_name, data):
     if "meta" not in store:
         store.create_group("meta")
     group = store["meta"]
-    #if 'metadata' in msg:
-    #    metadata = msg['metadata']
-    #    if 'namespace' in metadata:
-    #        namespace = metadata['namespace']
-    #        logging.info(f'buildCov() namespace: {namespace}')
-    # iter_number = msg['curr_iter']
-    # logging.info(f'Reading iteration number {iter_number}')
     mat = msg["MAT"]
     cov_name = "{}_{}".format(ch1, ch2)
     logging.info(cov_name)
@@ -218,12 +212,12 @@ def store_covariance(client_name, data):
     if "E" in msg:
         logging.info("Finished storing covariances")
         if Position_reporter.get_instance().incrementor == 1:
-            eigenDecompose(n_components=10)
+            eigenDecompose(n_components=Position_reporter.get_instance().args["PCA_PCS"])
         else:
             Position_reporter.get_instance().incrementor -= 1
 
 
-def eigenDecompose(n_components=10):
+def eigenDecompose(n_components):
     chroms = sorted([int(v) for v in store.keys() if v != 'meta'])
     cov_size = 0
     meta = store["meta"]

@@ -1,9 +1,9 @@
-# HYDRA
+# HyDRA
 Software for decentralized GWAS
 
 ## Tutorial  
 
-The easiest way to familiarize yourself with the pipeline is following this short [example](https://github.com/apoursh/HYDRA/tree/master/example) file. The example will walk through the setup and a mock GWAS using publicly available 1K genomes data.
+The easiest way to familiarize yourself with the pipeline is following this short [example](https://github.com/apoursh/HyDRA/tree/master/example) file. The example will walk through the setup and a mock GWAS using publicly available 1K genomes data.
 
 
 ## Setup
@@ -48,7 +48,7 @@ root@hydra:/app#
 ```
 
 Note that this step is the same for all users (server and centers). Additionally, if you run `docker ps`from the host machine, you should see two new containers currently running - one
-for HYDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HYDRA (e.g. `hydra_redis_1`). 
+for HyDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HyDRA (e.g. `hydra_redis_1`). 
     
 We use Celery to manage client jobs, and Celery uses Redis as its communication backbone.
 
@@ -297,6 +297,21 @@ As the clients perform their tasks, they may send further subtasks to the server
 will show up in the server logs, along with the name of the client that sent the task.
 Additionally, once the task is completed, the client will send a status update to the
 server, which will again show up in the server logs.
+
+
+## Parameter costumization
+
+The default parameters are specified in `src/lib/settings.py` under `Thresholds` class. To change these defaults, the user can directly modify the file (only the server side file is relevant) or specify the desired threshold using the same keywords before executing a task (e.g. `{"QC_HWE": "1e-6", "QC_MAF": ".05"}`). The parameters specified using the UI are not case sensitive and take precedence over the parameters specified in the `settings.py` file. Any extra parameters is ignored. 
+
+Currently the uptions are:
+
+* QC_hwe
+* PCA_maf
+* PCA_ld_window
+* PCA_ld_threshold
+* PCA_pcs
+* ASSO_pcs
+
 
 
 ## Troubleshooting

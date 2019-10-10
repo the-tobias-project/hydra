@@ -13,6 +13,7 @@ from sklearn.utils.extmath import svd_flip
 from client.lib import shared
 from lib import networking
 from lib.corr import nancorr
+from lib.utils import write_or_replace
 
 class LdReporter(object):
     __instance = None
@@ -170,10 +171,10 @@ def pca_projection(data, client_config):
             offset += i+1
         u = arr.dot(v.T).dot(np.diag(inv_sigma))
         u, v = svd_flip(u, v, u_based_decision=False)
-        dset = store.create_group("pca")
-        dset.create_dataset('pca_sigma', data=inv_sigma)
-        dset.create_dataset('pca_v.T', data=v)
-        dset.create_dataset('pca_u', data=u)
+        dset = store.require_group("pca")
+        write_or_replace(dset, 'pca_sigma', val=inv_sigma)
+        write_or_replace(dset, 'pca_v.T', val=v)
+        write_or_replace(dset, 'pca_u', val=u)
         #pca_vt = dset.require_dataset('pca_v.T', shape=v.shape,
         #    dtype=np.float32)
         #pca_vt[:,:] = v

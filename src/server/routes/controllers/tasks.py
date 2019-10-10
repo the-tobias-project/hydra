@@ -13,7 +13,7 @@ from lib.settings import Commands, Options, Thresholds
 from server.lib import task_init, task_qc, task_pca, task_ass
 from lib.client_registry import Registry
 
-
+# TODO helper for parameter validation and default specification
 
 def list_tasks():
     tsks = tasks.task_list
@@ -30,18 +30,28 @@ def start_task(task_name):
     if task_name == Commands.INIT:
         task_init.start_init_task()
     elif task_name.startswith(Commands.QC):
-        if Options.HWE not in args:  # default parameters
-            args[Options.HWE] = '1e-10'
+        if "QC_HWE" not in args:  # default parameters
+            args[Options.HWE] = Thresholds.QC_hwe
+        if "QC_MAF" not in args:  # default parameters
+            args[Options.MAF] = Thresholds.QC_maf
         logging.info(f"Specified Filters :{args}")
         task_qc.start_client_qc_task(args)
         task_qc.start_local_qc_task(args)
     elif task_name.startswith(Commands.PCA):
+        if "PCA_PCS" not in args:
+            args["PCA_PCS"] = Thresholds.PCA_pcs
+        else:
+            args["PCA_PCS"] = int(args["PCA_PCS"])
+        task_pca.Position_reporter.get_instance(args)
         if not task_pca.ready_to_decompose():
             if not task_pca.filtered():
-                if Options.MAF not in args:  # default parameters
+                if "PCA_MAF" not in args:  # default parameters
                     args[Options.MAF] = Thresholds.PCA_maf
-                if Options.LD not in args:  # default parameters
-                    args[Options.LD] = [Thresholds.PCA_ld_window, Thresholds.PCA_ld_threshold]
+                if "PCA_LD_WINDOW" not in args:  # default parameters
+                    args["PCA_LD_WINDOW"] = Thresholds.PCA_ld_window
+                if "PCA_LD_THRESHOLD" not in args:  # default parameters
+                    args["PCA_LD_THRESHOLD"] = Thresholds.PCA_ld_threshold
+                args[Options.LD] = [args["PCA_LD_WINDOW"], args["PCA_LD_THRESHOLD"]]
                 logging.info(f"Specified pruning filters :{args}")
                 task_pca.start_pca_filters(args)
             else:
@@ -49,11 +59,12 @@ def start_task(task_name):
                 task_pca.Position_reporter.get_instance().report_pos()
         else:
             logging.info("starting eigen decomposition")
-            task_pca.eigenDecompose(n_components=10)
+            task_pca.eigenDecompose(n_components=args["PCA_PCS"])
     elif task_name == Commands.ASSO:
+        if "ASSO_PCS" not in args:
+            args["ASSO_PCS"] = Thresholds.ASSO_pcs
         logging.info("Starting Associations")
-        # setup
-        ass_agg = task_ass.LogisticAdmm.get_instance(npcs=10, active=2)
+        task_ass.LogisticAdmm.get_instance(args, active=2)
     return networking.create_response(200, f'Started task {task_name}')
 
 
@@ -96,7 +107,7 @@ def start_subtask(task_name, subtask_name, client_name):
             task_pca.store_covariance(client_name, request.data)
 
     elif task_name.startswith(Commands.ASSO):
-        ass_agg = task_ass.LogisticAdmm.get_instance(npcs=10, active=2)
+        ass_agg = task_ass.LogisticAdmm.get_instance({}, active=2)
         if subtask_name == "adjust":
             ass_agg.update_stats(request.data)
         elif subtask_name == "estimate":

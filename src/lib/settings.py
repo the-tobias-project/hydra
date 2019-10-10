@@ -28,10 +28,16 @@ class Commands(object):
 
 
 class Thresholds(object):
+    # QC Options
     QC_hwe = 1e-10
+    QC_maf = 0.01
+    # PCA Options
     PCA_maf = 0.1
     PCA_ld_window = 50
     PCA_ld_threshold = 0.2
+    PCA_pcs = 10
+    # Association Options
+    ASSO_pcs = 10
 
 class Options(object):
     # HELP = Commands.HELP
