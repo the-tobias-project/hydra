@@ -46,11 +46,14 @@ def split_command(command):
 
 
 def start_client_qc_task(filters, stage=Commands.QC):
+    if stage == Commands.QC:
+        filters["mask_prefix"] = "QC"
+    else:
+        filters["mask_prefix"] = "PCA"
     data = pickle.dumps(filters)
     networking.message_clients("qc", data=data, env=app.config["ENV"])
     for client in clients:
         Registry.get_instance().set_client_state(client['name'], stage)
-
 
 
 def start_local_qc_task(filters, prefix=None):  # Filter based on local info

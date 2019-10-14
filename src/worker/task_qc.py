@@ -11,21 +11,18 @@ import numpy as np
 from client.lib import shared
 from lib import networking
 from lib.utils import write_or_replace
-from lib.corr import nancorr
 from lib.settings import QCFilterNames, Settings
 
 
 def init_qc(message, client_config, env):
     print("Pefroming QC")
     filters = pickle.loads(message)
-    remove = True
-    if "remove" in filters:
-        remove = filters["remove"]
-    run_QC(filters, client_config, remove=remove, env=env)
+    remove = filters.get("remove", False)
+    run_QC(filters, client_config, remove=remove, prefix=filters.get("mask_prefix", None), env=env)
     print('Finished reporting counts')
 
 
-def run_QC(filters, client_config, remove=True, env="production"):
+def run_QC(filters, client_config, prefix, remove=True, env="production"):
     def find_what_passes(qc_name, dset_name, tokeep, doubleSided=False):
         vals = group[dset_name].value
         if qc_name in filters:
@@ -58,7 +55,7 @@ def run_QC(filters, client_config, remove=True, env="production"):
             tokeep = find_what_passes(QCFilterNames.QC_MAF, "MAF",
                 tokeep, doubleSided=True)
             if QCFilterNames.QC_MPS in filters:
-                filters[QCFilterName.QC_MPS] = 1 - filters[QCFilterName.QC_MPS]
+                filters[QCFilterNames.QC_MPS] = 1 - filters[QCFilterNames.QC_MPS]
             tokeep  = find_what_passes(QCFilterNames.QC_MPS, "not_missing_per_snp", tokeep)
             print(f"After filtering {chrom}, {np.sum(tokeep)} snps remain")
             if remove: # Delete what doesn't pass
@@ -73,22 +70,21 @@ def run_QC(filters, client_config, remove=True, env="production"):
                     if snp in group:
                         del group[snp]
             else: # Store what has been tagged
-                if "passed" in group:
-                    tags = group["passed"]
-                    tokeep = np.logical_and(tokeep, tags.value)
-                    tags[:] = tokeep
-                else:
-                    if "PCA_passed" in group:
-                        del group["PCA_passed"]
-                    if "PCA_positions" in group:
-                        del group["PCA_positions"]
-                    group.create_dataset("PCA_passed",
-                        data=np.ones(np.sum(tokeep), dtype=bool))
-                    positions = group['positions'].value[tokeep]
-                    group.create_dataset("PCA_mask", data=tokeep, dtype=bool)
-                    group.create_dataset("PCA_positions", data=positions)
+                pass_mask = prefix + "_mask"
+                pos_mask = prefix + "_positions"
+                if pass_mask in group:
+                    del group[pass_mask]
+                if pos_mask in group:
+                    del group[pos_mask]
+                write_or_replace(group, pass_mask, val=tokeep, dtype=bool)
+                positions = group['positions'].value[tokeep]
+                write_or_replace(group, pos_mask, val=positions)
+                if prefix == "PCA":
+                    write_or_replace(group, "PCA_passed", val=np.ones(np.sum(tokeep), dtype=bool))
+                    if 'non_ld_mask' in group:
+                        del group['non_ld_mask']
     client_name = client_config['name']
-    if remove:
+    if prefix == "QC":
         networking.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name, env)
     else:
         networking.respond_to_server('api/tasks/PCA/FIN', "POST", b'', client_name, env)

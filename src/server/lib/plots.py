@@ -1,3 +1,5 @@
+# libs
+import os
 
 # third party lib
 import h5py
@@ -6,12 +8,12 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 import matplotlib.cbook
 import warnings
+import pandas as pd
 from scipy.stats import chi2
 
 chi2sf = chi2.sf
 warnings.simplefilter(action = "ignore", category = FutureWarning)
 warnings.filterwarnings("ignore", category=matplotlib.cbook.mplDeprecation)
-
 
 def qc_plots(plinkFile, outfile):
     af = []
@@ -62,15 +64,23 @@ def manhattan_plot(plinkFile, outfile):
     pos = []
     pval = []
     chroms = []
+    betas = []
+    chromosome = []
     with h5py.File(plinkFile, 'r') as store:
         for chrom in store.keys():
             if chrom == "meta"or chrom == "pca":
                 continue
             coef = store[f"meta/{chrom}/newton_coef"].value[:,1]
+            betas.append(coef)
             pos.append(store[f"{chrom}/positions"].value[coef[:,0] != 0])
             pval.append(chi2sf(-2*store[f"meta/{chrom}/newton_ell"].value,1))
-            chroms.append(chrom)
-    ax, fig = manhattan(pos, pval, chroms, alpha=.7)
+            chroms.append([int(chrom)] * coef.shape[0])
+            chromosome.append(chrom)
+    fbase = os.path.splitext(outfile)[0]
+    df = pd.DataFrame(data={"chrom": np.concatenate(chroms),  "positions": np.concatenate(pos),
+        "pval": np.concatenate(pval)[:,0], "coef": np.concatenate(betas)[:,0]})
+    df.to_csv(fbase + ".txt", sep='\t', index=False)
+    ax, fig = manhattan(pos, pval, chromosome, alpha=.7)
     plt.savefig(outfile)
 
 

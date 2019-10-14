@@ -31,12 +31,6 @@ def get_plink_store(pfile):
 def get_covar_file(pfile):
     dirname, basename = os.path.split(pfile)
     prefix = os.path.basename(dirname)
-    #print(dirname)
-    #current_loc = os.path.dirname(__file__)
-    #current_loc = os.path.join("..", "..", current_loc)
-    #path = os.path.join(current_loc, dirname)
-    #print (f"path is {path}")
-    #covar_file = os.path.relpath(current_loc, prefix, "HydraPheno")
     #return covar_file
     path = os.path.join(dirname, "HydraPheno")
     phenopath = os.path.abspath(path)

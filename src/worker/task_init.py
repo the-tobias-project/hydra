@@ -17,11 +17,32 @@ from lib import networking
 from lib.utils import write_or_replace
 from lib.corr import process_plink_row
 
+
 def init_store(client_config, env):
-    plinkToH5(client_config, env)
+    pfile = client_config['plinkfile']
+    store_name = shared.get_plink_store(pfile)
+    if os.path.isfile(store_name):
+        report_file_info(store_name, client_config, env)
+        print(f"HDF5 file {store_name} already exists")
+    else:
+        plinkToH5(client_config, env)
     print("preparing counts")
     report_counts(client_config, env)
     print('Finished reporting counts')
+
+def report_file_info(store_name, client_config, env):
+    #TODO make QC not actually delete stuff
+    with h5py.File(store_name, 'a') as store:
+        store.attrs['has_global_AF'] = False
+        store.attrs['has_centering'] = False
+        store.attrs['has_normalization'] = False
+        if "meta" in store:
+            del store["meta"]
+        if "pca" in store:
+            del store["pca"]
+        for chrom in store:
+            positions = store[f"{chrom}/positions"].value
+            send_positions_to_server(positions, chrom, client_config, env)
 
 
 def plinkToH5(client_config, env):
@@ -51,8 +72,7 @@ def plinkToH5(client_config, env):
         store.attrs['has_normalization'] = False
         potential_pheno_file = pfile+".pheno"
         if os.path.isfile(pfile+".pheno"):
-            with open(potential_pheno_file, 'r') as f:
-                affection = np.loadtxt(potential_pheno_file, dtype=int, usecols=2)
+            affection = np.loadtxt(potential_pheno_file, dtype=int, usecols=2)
         else:
             affection = [sample.affection for sample in sample_list]
         if len(np.unique(affection)) > 2:
@@ -177,19 +197,19 @@ def init_stats(message, client_config, env):
         if "MISS" in message:
             vals = message["MISS"]
             task = "not_missing_per_snp"
-            dset = chrom_group.create_dataset(task, data=1 - vals)
+            write_or_replace(chrom_group, task, val=1-vals)
         if "AF" in message:
             vals = message["AF"]
             task = 'MAF'
-            dset = chrom_group.create_dataset(task, data=vals)
+            write_or_replace(chrom_group, task, val=vals)
         if "HWE" in message:
             vals = message["HWE"]
             task = "hwe"
-            dset = chrom_group.create_dataset(task, data=vals)
+            write_or_replace(chrom_group, task, val=vals)
         if "VAR" in message:
             vals = message["VAR"]
             task = "VAR"
-            dset = chrom_group.create_dataset(task, data=vals)
+            write_or_replace(chrom_group, task, val=vals)
     print('Finished with init_stats.')
 
     client_name = client_config['name']

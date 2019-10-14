@@ -114,7 +114,8 @@ class LogisticAdmm(object):
         self.client_config = client_config
         y = self.Ys
         model = data["Estimated"]
-        print(f"Updating {model}")
+        if model != "Small":
+            print(f"Updating {model}")
         beta = None
         if "VALS" in data:
             beta = data["VALS"]
@@ -168,8 +169,9 @@ class LogisticAdmm(object):
         y = y.reshape(n)
         covariates = self.covariates.copy()
         group = store[chrom]
-        af = group["MAF"]
-        positions = group["positions"]
+        positions = group["QC_positions"]
+        mask = group["QC_mask"].value
+        af = group["MAF"].value[mask]
         ncov = self.covariates.shape[1]
         baselikelihood = self.baseline_likelihood[chrom]
         if unconverged is None:
@@ -233,7 +235,7 @@ class LogisticAdmm(object):
         include_mask = self.include_mask
         L = x0.shape[0]
         group = store[chrom]
-        positions = group["positions"].value
+        positions = group["QC_positions"].value
         if mask is not None:
             positions = positions[mask[:,0]]
         covariates = self.covariates.copy()
@@ -273,7 +275,7 @@ class LogisticAdmm(object):
         y = y.reshape(n)
         covariates = self.covariates.copy()
         group = store[chrom]
-        positions = group["positions"]
+        positions = group["QC_positions"]
         ncov = self.covariates.shape[1]
         estimates = np.zeros((len(positions), ncov))
         if warm_start is None:
@@ -368,7 +370,7 @@ class LogisticAdmm(object):
             group = self.store[model]
             af = group["MAF"].value
             tokeep = np.logical_and(af>self.threshold, 1-af>self.threshold)
-            positions = group["positions"].value
+            positions = group["QC_positions"].value
             ell = np.zeros((1,positions.shape[0]))
             for i, position in enumerate(positions):
                 if not tokeep[i]:
