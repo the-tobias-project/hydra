@@ -1,5 +1,9 @@
-FROM python:3.6.8
+FROM continuumio/miniconda3
 
+RUN conda update -y conda -n root 
+RUN conda create -n env python=3.6.8
+RUN echo "source activate env" > ~/.bashrc
+ENV PATH /opt/conda/envs/env/bin:$PATH
 RUN apt-get update && \
     apt-get install -y apt-utils && \
     apt-get install -y build-essential && \
@@ -24,3 +28,4 @@ ADD ./corr.cpp /app
 ADD ./plink2_stats.cpp /app
 
 RUN pip install --trusted-host pypi.python.org -r /app/build/requirements.txt
+RUN conda install h5py==2.8.0 

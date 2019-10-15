@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import time
+import subprocess
 
 # third party lib
 from celery import current_app
@@ -22,6 +23,7 @@ def init_store(client_config, env):
     pfile = client_config['plinkfile']
     store_name = shared.get_plink_store(pfile)
     if os.path.isfile(store_name):
+        clear_consistency_flag(store_name)
         report_file_info(store_name, client_config, env)
         print(f"HDF5 file {store_name} already exists")
     else:
@@ -29,6 +31,18 @@ def init_store(client_config, env):
     print("preparing counts")
     report_counts(client_config, env)
     print('Finished reporting counts')
+
+
+def clear_consistency_flag(fname):
+    print(fname)
+    try:
+        child_sig = subprocess.call([f"h5clear -s {fname}"], shell=True)
+        if child_sig != 0:
+            child_sig("Flag has not been cleared", child_sig, file=sys.stderr)
+    except OSError as e:
+        print("Execution failed:", e, file=sys.stderr)
+
+
 
 def report_file_info(store_name, client_config, env):
     #TODO make QC not actually delete stuff
