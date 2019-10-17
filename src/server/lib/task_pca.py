@@ -28,7 +28,6 @@ def ready_to_decompose():
     if "meta" not in store:
         return False
     meta = store["meta"]
-    print(chroms)
     for ch1 in chroms:
         for ch2 in chroms:
             if "{}_{}".format(ch1, ch2) not in meta and "{}_{}".format(ch2, ch1) not in meta:
@@ -38,12 +37,14 @@ def ready_to_decompose():
 
 def filtered():
     chrom = [key for key in store if key != "meta"][0]
-    if "PCA_passed" in store[chrom] :
+    if "PCA_passed" in store[chrom]:
         return True
     return False
 
 
 def start_pca_filters(filters):
+    global TIME
+    TIME = time.time()
     logging.info("Initiating PCA filters...")
     qc_subset_filters = {key: value for key, value in filters.items()
                          if key != PCAFilterNames.PCA_LD}
@@ -67,6 +68,7 @@ class CovarianceAggregator(object):
             self.r1 = int(win_size)
             self.r2 = int(win_size/2)
             self.thresh = thresh
+            self.print_int = 1000
             CovarianceAggregator.__instance = self
 
     @staticmethod
@@ -101,8 +103,7 @@ class CovarianceAggregator(object):
                 corr_tot = corr(self.sumLin[key], self.sumSq[key],
                                 self.cross[key])
                 group = store[key]
-                tokeep = store["{}/PCA_passed".format(key)].value
-                #positions = self.store["{}/PCA_positions".format(key)].value
+                tokeep = store[f"{key}/PCA_passed"].value
                 end = min(self.r1 + self.r0, len(tokeep))
                 maf = store["{}/PCA_allele_freq".format(key)].value[
                     self.r0:end]
@@ -134,6 +135,9 @@ class CovarianceAggregator(object):
                 pca_passed = store["{}/PCA_passed".format(key)]
                 pca_passed[:] = tokeep
                 end = min(self.r1 + self.r0 + self.r2, len(tokeep))
+                if end > self.print_int:
+                    logging.info(f"{end/len(tokeep)*100:.2f}% done with LD pruning.")
+                    self.print_int += 1000
                 if self.r2 + self.r0 >= len(tokeep) - 1:
                     message[key] = "END"
                 else:
@@ -156,7 +160,7 @@ class Position_reporter(object):
             Position_reporter.__instance = self
 
     @staticmethod
-    def get_instance(args={}):##TODO this is dangerous. If num_clients or win_size changes
+    def get_instance(args={}):  ##TODO this is dangerous. If num_clients or win_size changes
         if Position_reporter.__instance is None:
             Position_reporter(args)
         return Position_reporter.__instance
@@ -195,22 +199,20 @@ def store_covariance(client_name, data):
     msg = pickle.loads(data)
     ch1 = msg["CH1"]
     ch2 = msg["CH2"]
-    logging.info("dealing with {}_{}".format(ch1, ch2))
+    logging.info(f"Storing covariance {ch1}x{ch2} from {client_name}.")
     if "meta" not in store:
         store.create_group("meta")
     group = store["meta"]
     mat = msg["MAT"]
-    cov_name = "{}_{}".format(ch1, ch2)
-    logging.info(cov_name)
+    cov_name = f"{ch1}_{ch2}"
     if cov_name in group:
         #mat += group[cov_name].value
         stored = group[cov_name]
         stored[:,:] += mat
     else:
         group.create_dataset(cov_name, data=mat)
-    logging.info(cov_name)
     if "E" in msg:
-        logging.info("Finished storing covariances")
+        logging.info("Finished storing covariances.")
         if Position_reporter.get_instance().incrementor == 1:
             eigenDecompose(n_components=Position_reporter.get_instance().args["PCA_PCS"])
         else:
@@ -224,8 +226,8 @@ def eigenDecompose(n_components):
     if "Vs" not in meta:
         for chrom in chroms:
             cov_size += meta["{}_{}".format(chrom, chrom)].shape[0]
-        logging.info("Starting covariance matrix of size {} x {}".format(
-            cov_size, cov_size))
+        logging.info(f"""Starting covariance matrix of size {cov_size} x {cov_size} \
+using chromosomes: {chroms}""")
         cov = np.empty((cov_size, cov_size), dtype=np.float32)
         i_old = 0
         for chrom1 in chroms:
@@ -236,7 +238,7 @@ def eigenDecompose(n_components):
                 cov_name = "{}_{}".format(chrom1, chrom2)
                 if cov_name in meta:
                     pcov = meta[cov_name].value
-                    print(cov_name, pcov.shape)
+                    logging.debug(f"{cov_name} is of size {pcov.shape}.")
                     cov[i_old:i_old+pcov.shape[0], j_old:j_old+pcov.shape[1]] = pcov
                     cov[j_old:j_old+pcov.shape[1], i_old:i_old+pcov.shape[0]] = pcov.T
                     j_old += pcov.shape[1]
@@ -247,17 +249,17 @@ def eigenDecompose(n_components):
         v = np.array(v)
         sigma = np.array(sigma)
         sigma[sigma < 0] = 0
-        print(sigma)
+        logging.info(f"Top eigenvalues are {sigma}")
         meta.create_dataset('Sigmas', data = sigma)
         meta.create_dataset('Vs', data = v)
     else:
-        logging.info("Eigenvalue decomposition is already done")
+        logging.info("Eigenvalue decomposition has already been done.")
         sigma = meta["Sigmas"].value
         v = meta["Vs"].value
     sigma = np.sqrt(sigma) * np.sqrt(v.shape[0])
     inv_sigma = sigma.copy()
     inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
-    print(chroms)
     msg = {"ISIG": inv_sigma, "V": v, "CHROMS": chroms}
     msg = pickle.dumps(msg)
     networking.message_clients("pca/eig", data=msg, env=app.config["ENV"])
+    logging.info(f"PCA took roughly {time.time()-TIME:.1f} seconds.")

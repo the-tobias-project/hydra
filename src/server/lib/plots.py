@@ -104,7 +104,7 @@ def manhattan(positions, y, chroms, ax=None, alpha=.7, **kwargs):
     for i, chrom in enumerate(chroms):
         tick_pos.append((positions[i][-1]+start)/2/tot)
         start = positions[i][-1]
-        ax.scatter(positions[i]/tot, y[i], c=colors[i%2], alpha=alpha, edgecolors='none', **kwargs)
+        ax.scatter(positions[i]/tot, y[i], c=np.array([colors[i%2]]), alpha=alpha, edgecolors='none', **kwargs)
         ax.set_xlim(-edge_clearance, 1+edge_clearance)
     ax.set_xticks(tick_pos)
     ax.set_xticklabels(labels=chroms)

@@ -24,7 +24,8 @@ def add_client(client):
     added = registry.add_client(client)
     if not added:
         return networking.create_response(400, 'Client already registered')
-    logging.info(f'Added client {client}')
+    logging.info(f"""Added {client['name']}, listening host: {client['listen_host']}, \
+external_host: {client['external_host']}""")
     return networking.create_response(200)
 
 
@@ -38,6 +39,7 @@ def remove_client(client_name):
 
     registry = Registry.get_instance()
     registry.remove_client(client_name)
+    logging.info(f"Removed {client_name}")
     return networking.create_response(200)
 
 

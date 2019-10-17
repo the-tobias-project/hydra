@@ -3,6 +3,7 @@ import logging
 import pickle
 import re
 import os
+import time
 
 # third party lib
 import h5py
@@ -27,15 +28,15 @@ def split_command(command):
     filters = {}
     name = Options.HWE
     x = re.search(name+refloat, command)
-    if x: # hwe filter
+    if x:  # hwe filter
         filters[name] = float(x.group()[len(name):])
     name = Options.MAF
     x = re.search(name+refloat, command)
-    if x: # maf filter
+    if x:  # maf filter
         filters[name] = float(x.group()[len(name):])
     name = Options.MPS
     x = re.search(name+refloat, command)
-    if x: # missing per SNP is filter
+    if x:  # missing per SNP is filter
         filters[name] = float(x.group()[len(name):])
     name = Options.LD
     x = re.search(name+"[0-9]*_"+refloat, command)
@@ -46,6 +47,8 @@ def split_command(command):
 
 
 def start_client_qc_task(filters, stage=Commands.QC):
+    global TIME
+    TIME = time.time()
     if stage == Commands.QC:
         filters["mask_prefix"] = "QC"
     else:
@@ -62,12 +65,12 @@ def start_local_qc_task(filters, prefix=None):  # Filter based on local info
     for chrom in store.keys():
         if chrom == 'meta':
             continue
-        group  = store[chrom]
-        pos    = group['positions']
+        group = store[chrom]
+        pos = group['positions']
         counts = group['counts']
-        mr     = group['missing_rates']
-        af     = group['allele_freq']
-        hwe    = group['hwe']
+        mr = group['missing_rates']
+        af = group['allele_freq']
+        hwe = group['hwe']
         tokeep = np.ones(shape=pos.value.shape, dtype=bool)
         if Options.HWE in filters:
             val = float(filters[Options.HWE])
@@ -81,7 +84,7 @@ def start_local_qc_task(filters, prefix=None):  # Filter based on local info
             tokeep = np.logical_and(tokeep, mr.value < val)
         logging.info("In chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
             tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
-        # Delete or tag the filtered locations
+        #  Delete or tag the filtered locations
         if prefix is None:
             pos_vals, counts_vals = pos.value[tokeep], counts.value[tokeep]
             mr_vals = mr.value[tokeep]
@@ -123,7 +126,8 @@ def start_local_qc_task(filters, prefix=None):  # Filter based on local info
 def filter_finished(client_name, state):
     Registry.get_instance().set_client_state(client_name, "Filterd")
     if not Registry.get_instance().num_clients_in_state(state):
-        logging.info(f"Done with filtering in {Commands.QC} stage")
+        logging.info(f"Done with filtering in {Commands.QC} stage.")
         task_init.make_plots("QC_post_filter.png")
+        logging.info(f"QC took roughly {time.time() - TIME:.1f} seconds.")
         return True
     return False

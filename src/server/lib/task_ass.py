@@ -18,10 +18,7 @@ from lib.client_registry import Registry
 from lib.utils import write_or_replace
 import lib.networking as networking
 from server.lib.plots import manhattan_plot
-import pdb
 
-
-#from  sklearn.linear_model import LogisticRegression as lr
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
@@ -37,6 +34,7 @@ class LogisticAdmm(object):
         if LogisticAdmm.__instance is not None:
             return
         else:
+            self.time = time.time()
             self.estimates = {}
             self.iters, self.accumulant = {}, {}
             self.chroms = [v for v in store.keys() if v != 'meta']
@@ -54,6 +52,7 @@ class LogisticAdmm(object):
             self.Hess, self.Gradients, self.Diags, self.Vals = {}, {}, {}, {}
             self.converged, self.linesearch_convergence = {}, {}
             self.threshold = .005
+            self.EPS = 1e-4
             self.linesearch_iter, self.fchanges = {}, {}
             self.scratch_likelihoods = {}
             self.alpha, self.BETA = .1, .5
@@ -128,11 +127,8 @@ class LogisticAdmm(object):
 
     def update(self, message):
         message = pickle.loads(message)
-        #if "H" in message:
-        #    pdb.set_trace()
         z_hat = message["VALS"]
         model = message["Estimated"]
-        logging.info(f"Updating Estimate from {model}")
         self.update_estimate(z_hat, model, message)
 
     def association_finished(self):
@@ -150,17 +146,18 @@ class LogisticAdmm(object):
             prev = self.estimates[model]
             #self.normalization_stats["data"] = np.vstack((self.normalization_stats["data"], data["cov"]))
             if prev[1] == 1:
-                logging.info(f"Finished iteration {self.iters[model]} on chrom {model}")
                 beta = (prev[0] + z_hat)/(self.nconnections)
                 self.iters[model] += 1
+                if not self.iters[model] % 10:
+                    logging.info(f"Finished iteration {self.iters[model]} on {model}")
+                    if model == "Small":
+                        logging.info(f"{np.sum(np.abs(beta - self.beta))}")
+                    else:
+                        logging.info(f"{np.linalg.norm(beta[7,:] - self.beta)}")
                 if model == "Small":
-                    #print(np.linalg.norm(beta - self.beta))
-                    print(np.sum(np.abs(beta - self.beta)))
                     self.beta = beta
                 else:
-                  print(np.linalg.norm(beta[7,:] - self.beta))
                   self.beta = beta[7,:]
-
 
                 if self.iters[model] == self.max_iters:#TODO this shouldn't happen but why does it?
                     write_or_replace(store, f"meta/{model}/coef", beta)
@@ -225,11 +222,6 @@ class LogisticAdmm(object):
             self.Hess[model] = data['H']
             self.covars[model] = data['covar']
             self.accumulant[model] = self.nconnections - 1
-        #if self.accumulant[model] == 0:
-        #    pdb.set_trace()
-        #    h = np.triu(self.Hess[model][25,:,:])
-        #    h += h.T
-        #    h += np.diag(self.Diags[model][51,:])
         finished_collecting = False
         if self.accumulant[model] == 0:
             finished_collecting = True
@@ -256,6 +248,7 @@ class LogisticAdmm(object):
             af = af[old_not_converged[:,0]]
             x0 = x0[old_not_converged[:,0]]
             convergence_status = np.zeros((x0.shape[0],1), dtype=bool)
+        logging.info(f"Now updating coefficient estimates for chr{model} iteration: {self.iters[model]}")
         for i, g in enumerate(gs):
             if af[i] < self.threshold or 1-af[i] < self.threshold:
                 convergence_status[i] = True
@@ -292,7 +285,9 @@ class LogisticAdmm(object):
             self.active_chroms.remove(model)
             if not self.chroms:
                 self.set_clients_state("ASSO_DONE")
-                logging.info("We are done with association")
+                logging.info("We are done with association.")
+                logging.info(f"Computing coefficients took roughly {time.time() - self.time:.1f} seconds.")
+                self.time = time.time()
                 #COMPUTE PVALS
             else:
                 chrom = self.chroms.pop()
@@ -331,6 +326,9 @@ class LogisticAdmm(object):
                     del self.Diags[model], self.fchanges[model]
                     if all(value for value in self.finished.values()):
                         manhattan_plot(storePath, "manhattan_plot.png")
+                        logging.info("P-value computation is Done!")
+                        logging.info(f"Computing P-values took roughly {time.time() - self.time:.1f} seconds.")
+                        store.close()
                 else:
                     self.newton_test_new_point(model)
         else:
@@ -391,9 +389,13 @@ class LogisticAdmm(object):
 
     def update_pval(self, message):
         def _share_new_ll():
+            print (self.chroms)
             if len(self.chroms) >= 1:
                new_model = self.chroms.pop()
                self.send_coef(new_model, {})
+            else:
+                logging.info("P-value computation is Done!")
+                logging.info(f"Computing P-values took roughly {time.time() - self.time:.1f} seconds.")
 
         message = pickle.loads(message)
         model = message["Estimated"]
@@ -404,7 +406,6 @@ class LogisticAdmm(object):
         if model in self.likelihood:
             prev  = self.likelihood[model]
             if prev[1] == 1:
-                #pdb.set_trace()
                 ell = prev[0] + val
                 pval = chi2sf(-2*ell,1)
                 write_or_replace(store, f"meta/{model}/ell", ell)
