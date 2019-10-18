@@ -2,18 +2,20 @@
 import os
 import pickle
 import time
+import logging
 
 # third party lib
 import h5py
 import numpy as np
 from sklearn.utils.extmath import svd_flip
 
-
 # internal lib
 from client.lib import shared
 from lib import networking
 from lib.corr import nancorr
 from lib.utils import write_or_replace
+
+logger = logging.getLogger("worker")
 
 class LdReporter(object):
     __instance = None
@@ -23,6 +25,7 @@ class LdReporter(object):
             return
         else:
             self.r3 = 0
+            self.print_int = 1000
             self.r1, self.r2 = win_size, int(win_size/2)
             LdReporter.__instance = self
             pfile = client_config["plinkfile"]
@@ -58,7 +61,7 @@ class LdReporter(object):
                     networking.respond_to_server('api/tasks/PCA/PCAPOS', 'POST', msg,
                                                  client_config['name'], env)
                     self.store.close()
-                    print("Done with LD pruning")
+                    logger.info("Done with LD pruning.")
                     return
                 continue
             else:
@@ -75,7 +78,9 @@ class LdReporter(object):
         msg = pickle.dumps(msg)
         networking.respond_to_server('api/tasks/PCA/LD', 'POST', msg, client_config['name'], env)
         self.r3 += self.r2
-        print(self.r3)
+        if self.r3 > self.print_int:
+            logger.info(f"pruning at {self.r3}")
+            self.print_int += 1000
 
 
 def store_filtered(message, client_config):
@@ -133,14 +138,14 @@ def report_cov(client_config, env):
                 g2 = standardize_mat(g2.transpose(), af2, sd2).transpose()
                 msg["CH1"] = ch1
                 msg["CH2"] = ch2
-                print(f"Reporting cov: {ch1}_{ch2}: {g1.shape} x {g2.shape}")
+                logger.info(f"Reporting cov: {ch1}_{ch2}: {g1.shape} x {g2.shape}")
                 msg["MAT"] = g1.dot(g2).astype(np.float32)
                 if ch1 == chroms[-1] and ch2 == chroms[-1]:
                     msg["E"] = True
                 msg = pickle.dumps(msg)
                 #time.sleep(1)
                 networking.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'], env)
-        print(f"Final size will be {size}")
+        logger.info(f"Final size will be {size}")
 
 
 def pca_projection(data, client_config):
@@ -181,4 +186,4 @@ def pca_projection(data, client_config):
         #pca_u = dset.require_dataset('pca_u', shape=u.shape,
         #    dtype=np.float32)
         #pca_u[:,:] = u
-    print("Done with projection!")
+    logger.info("Done with projection!")

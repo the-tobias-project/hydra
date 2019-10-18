@@ -146,7 +146,6 @@ class CovarianceAggregator(object):
             self.counter = 0
             self.r0 += self.r2
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
-#            self.tqdm.update(self.r2)
 
 class Position_reporter(object):
     __instance = None

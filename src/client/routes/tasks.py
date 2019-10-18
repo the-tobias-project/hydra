@@ -66,7 +66,6 @@ def qc():
 
 @bp.route('/pca/ld', methods=['POST'])
 def ld_report():
-    logging.info('Got command for LD')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.report_ld',
                             [request.data, app.config['client'], app.config['ENV']],
@@ -132,7 +131,6 @@ def lr_init():
 
 @bp.route('/asso/estimate', methods=['POST'])
 def lr_association():
-    logging.info('Regression update')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.asso',
                             [request.data, app.config['client']],

@@ -4,6 +4,7 @@ import pickle
 import sys
 import time
 import subprocess
+import logging
 
 # third party lib
 from celery import current_app
@@ -11,13 +12,13 @@ import h5py
 import numpy as np
 from plinkio import plinkfile
 
-
 # internal lib
 from client.lib import shared
 from lib import networking
 from lib.utils import write_or_replace
 from lib.corr import process_plink_row
 
+logger = logging.getLogger("worker")
 
 def init_store(client_config, env):
     pfile = client_config['plinkfile']
@@ -25,23 +26,21 @@ def init_store(client_config, env):
     if os.path.isfile(store_name):
         clear_consistency_flag(store_name)
         report_file_info(store_name, client_config, env)
-        print(f"HDF5 file {store_name} already exists")
+        logger.info(f"HDF5 file {store_name} already exists.")
     else:
         plinkToH5(client_config, env)
-    print("preparing counts")
+    logger.info("Preparing counts.")
     report_counts(client_config, env)
-    print('Finished reporting counts')
+    logger.info('Finished reporting counts.')
 
 
 def clear_consistency_flag(fname):
-    print(fname)
     try:
         child_sig = subprocess.call([f"h5clear -s {fname}"], shell=True)
         if child_sig != 0:
-            child_sig("Flag has not been cleared", child_sig, file=sys.stderr)
+            child_sig("Consistency flag has not been cleared.", child_sig, file=sys.stderr)
     except OSError as e:
-        print("Execution failed:", e, file=sys.stderr)
-
+        logger.Error("Execution failed:", e, file=sys.stderr)
 
 
 def report_file_info(store_name, client_config, env):
@@ -63,21 +62,20 @@ def plinkToH5(client_config, env):
     """Gets plink prefix, produces an HDF file with the same prefix"""
     pfile = client_config['plinkfile']
     store_name = shared.get_plink_store(pfile)
-    print('opening plinkfile')
+    logger.info(f'Opening plinkfile: {pfile}')
     try:
         plink_file = plinkfile.open(pfile)
     except MemoryError as e:
-        print('memory error!')
-        print(e)
-    print('opened plinkfile')
+        logger.error('MemoryError!')
+        logger.error(e)
     if not plink_file.one_locus_per_row():
-        print("""This script requires that snps are
+        logger.error("""This script requires that snps are
             rows and samples columns.""")
         sys.exit(1)
     sample_list = plink_file.get_samples()
     locus_list = plink_file.get_loci()
     n_tot = len(sample_list)
-    print('opening h5py file')
+    logger.info(f'Opening h5py file:{store_name}')
     with h5py.File(store_name, 'w', libver='latest') as store:
         store.attrs['n'] = len(sample_list)
         store.attrs['has_local_AF'] = False
@@ -96,8 +94,8 @@ def plinkToH5(client_config, env):
         write_or_replace(store, 'meta/id', ids, 'S11')
         del ids, affection
         # Read Demographic file
-        print(f'Reading demographic file at {pfile}.ind')
-        print(f'File exists: {os.path.isfile(pfile + ".ind")}')
+        logger.info(f'Reading demographic file at {pfile}.ind')
+        logger.info(f'File exists: {os.path.isfile(pfile + ".ind")}')
         with open(pfile + ".ind", 'r') as dem_f:
             dem = [(row.split("\t")[2]).encode("UTF8") for row in dem_f]
             write_or_replace(store, 'meta/regions', dem)
@@ -131,9 +129,9 @@ def plinkToH5(client_config, env):
             counts, geno = process_plink_row(row, genotypes)
             # This should be a try except
             try:
-              dset = current_group.create_dataset(pos, data=geno)
+                dset = current_group.create_dataset(pos, data=geno)
             except:
-              print(pos)
+                logger.error(f"Cannot write position: chr{locus.chromosome} {pos}")
             rsids.append(locus.name.encode('utf8'))
             positions.append(pos)
             all_counts.append(counts)
@@ -143,8 +141,8 @@ def plinkToH5(client_config, env):
             write_or_replace(current_group, 'rsids', rsids)
             write_or_replace(current_group, 'counts', all_counts, np.uint32)
             send_positions_to_server(positions, current_chr, client_config, env)
-    print('Closing plink file, finished with plinkToH5()')
     plink_file.close()
+    logger.info('Finished writing plink to hdf5.')
 
 
 def report_counts(client_config, env):
@@ -165,7 +163,7 @@ def report_counts(client_config, env):
             countDict["COUNTS"] = count_arr
             if chrom == keys[-1]:
                 countDict["END"] = True
-            print(f'Sending counts for chrom {chrom}')
+            logger.info(f'Sending counts from chrom {chrom}.')
             send_counts_to_server(countDict, client_config, env)
 
 
@@ -181,15 +179,12 @@ def send_positions_to_server(positions, chrom, client_config, env):
 
 
 def send_counts_to_server(data, client_config, env):
-    print('sending counts to server')
     client_name = client_config['name']
     data = pickle.dumps(data)
     networking.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name, env)
-    print('sent counts to server')
 
 
 def init_stats(message, client_config, env):
-    print('Inside init_stats')
     # Wait on previous tasks to finish
     i = current_app.control.inspect()
     client_name = client_config['name']
@@ -197,14 +192,13 @@ def init_stats(message, client_config, env):
         active_tasks = i.active()[f'celery@{client_name}']
         dependent_tasks = list(filter(lambda x: x['name'] == 'tasks.init_store', active_tasks))
         if len(dependent_tasks) > 0:
-            print('Waiting on tasks.init_store to finish')
+            logger.info('Waiting on tasks.init_store to finish.')
             time.sleep(.1)
         else:
             break
-    print('Resuming with init_stats')
     message = pickle.loads(message)
     chrom = message["CHROM"]
-    print(f'Chrom: {chrom}')
+    logger.info(f'Computing statistics for Chrom: {chrom}.')
     pfile = client_config['plinkfile']
     with h5py.File(shared.get_plink_store(pfile), 'a') as store:
         chrom_group = store[str(chrom)]
@@ -224,7 +218,7 @@ def init_stats(message, client_config, env):
             vals = message["VAR"]
             task = "VAR"
             write_or_replace(chrom_group, task, val=vals)
-    print('Finished with init_stats.')
+    logging.info(f'Finished initializing QC statistics for chrom {chrom}.')
 
     client_name = client_config['name']
     status = f'Finished with init stats for chrom {chrom}.'

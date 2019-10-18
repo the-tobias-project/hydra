@@ -7,3 +7,4 @@ CELERY_ACCEPT_CONTENT = ["pickle"]
 #CELERY_BACKEND_URL = Settings.redis_uri
 BROKER_URL = Settings.redis_uri
 BACKEND_URL = Settings.redis_uri
+CELERYD_HIJACK_ROOT_LOGGER = False

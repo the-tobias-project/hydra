@@ -1,6 +1,7 @@
 # stdlib
 import pickle
 import time
+import logging
 
 # third party lib
 import h5py
@@ -15,6 +16,8 @@ from lib.optimizationAux import other_newton, ltri_Hessians, function_values
 from lib.opt import minimize_lbfgs
 
 #TODO clean up Us etc
+
+logger = logging.getLogger("worker")
 
 class LogisticAdmm(object):
     __instance = None
@@ -50,7 +53,7 @@ class LogisticAdmm(object):
         y = np.loadtxt(name, usecols=[index], delimiter='\t', skiprows=1)
         n = y.shape[0]
         self.include_mask = np.array(y != -9)
-        print (f"{np.sum(self.include_mask)} out of {n} individuals have the phenotype.")
+        logger.info(f"{np.sum(self.include_mask)} out of {n} individuals have the phenotype.")
         y = y[self.include_mask]
         n = int(np.sum(self.include_mask))
         self.Ys = np.sign(y - .5).reshape(n, 1)
@@ -115,7 +118,7 @@ class LogisticAdmm(object):
         y = self.Ys
         model = data["Estimated"]
         if model != "Small":
-            print(f"Updating {model}")
+            logger.info(f"Updating {model}")
         beta = None
         if "VALS" in data:
             beta = data["VALS"]
@@ -145,7 +148,6 @@ class LogisticAdmm(object):
             all_Us = self.previous_Us[model] + z_hat - warm_start
         else:
             all_Us = 0
-        #print(covariates)
         if warm_start is None:
             estimates[:, 0] = other_newton(covariates, np.zeros((ncov-1)),
                 np.zeros((ncov-1,)), rho, estimates[:,0], ncov-1)
@@ -163,7 +165,7 @@ class LogisticAdmm(object):
 
     def run_newton_lr(self, y, chrom=None, warm_start=None, unconverged=None):
         store = self.store
-        print("starting with newtons")
+        logger.info("starting with newtons")
         include_mask = self.include_mask
         n = np.sum(include_mask)
         y = y.reshape(n)
@@ -195,7 +197,7 @@ class LogisticAdmm(object):
           #      print(f"Count is {count}")
           #      break
             if not i % 5000:
-                print(f"{time.time()-t} Done with {float(i/L)}")
+                logger.info(f"After {time.time()-t:.1f}s done with {float(i/L)*100:.1f}% of iteration.")
             if af[i] < self.threshold or (1-af[i]) < self.threshold:
                 continue
             val = group[str(position)].value[include_mask]
@@ -302,10 +304,10 @@ class LogisticAdmm(object):
           #      print(f"Count is {count}")
           #      break
             if not i % 100:
-                print(f"{time.time()-t}")
+                logger.info(f"{time.time()-t}")
                 t = time.time()
                 t2 = 0
-                print (float(i/len(positions)))
+                logger.info(f"{float(i/len(positions))}")
             if af[i] < self.threshold or (1-af[i]) < self.threshold:
                 estimates[i,:] = np.nan
                 continue

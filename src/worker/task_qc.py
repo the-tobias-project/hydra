@@ -1,6 +1,7 @@
 # stdlib
 import pickle
 import time
+import logging
 
 # third party lib
 import h5py
@@ -13,13 +14,14 @@ from lib import networking
 from lib.utils import write_or_replace
 from lib.settings import QCFilterNames, Settings
 
+logger = logging.getLogger("worker")
 
 def init_qc(message, client_config, env):
-    print("Pefroming QC")
+    logger.info("Pefroming QC.")
     filters = pickle.loads(message)
     remove = filters.get("remove", False)
     run_QC(filters, client_config, remove=remove, prefix=filters.get("mask_prefix", None), env=env)
-    print('Finished reporting counts')
+    logger.info('Finished reporting counts.')
 
 
 def run_QC(filters, client_config, prefix, remove=True, env="production"):
@@ -57,7 +59,7 @@ def run_QC(filters, client_config, prefix, remove=True, env="production"):
             if QCFilterNames.QC_MPS in filters:
                 filters[QCFilterNames.QC_MPS] = 1 - filters[QCFilterNames.QC_MPS]
             tokeep  = find_what_passes(QCFilterNames.QC_MPS, "not_missing_per_snp", tokeep)
-            print(f"After filtering {chrom}, {np.sum(tokeep)} snps remain")
+            logger.info(f"After filtering {chrom}, {np.sum(tokeep)} snps remain")
             if remove: # Delete what doesn't pass
                 replace_dataset(tokeep, 'hwe')
                 replace_dataset(tokeep, 'VAR')
