@@ -1,7 +1,9 @@
+
 # stdlib
 import argparse
 import io
 import logging
+import logging.config
 import os
 import yaml
 
@@ -11,6 +13,8 @@ from flask import current_app
 
 # Internal lib
 from lib import settings
+from lib.logging_config import return_config
+
 
 options = {"swagger_ui": True}
 app = connexion.FlaskApp(__name__, options=options)
@@ -32,6 +36,7 @@ def parse_args():
                                                     f'Defaults to {settings.Settings.local_scratch}')
     parser.add_argument('--dev', type=bool, default=False, help='[OPTIONAL] Specify a development environment.  '
                                                                 'WARNING: this will bypass security checks.')
+    parser.add_argument('--verbose', type=bool, default=False, help='[OPTIONAL] Specify log verbosity. ')
     return parser.parse_args()
 
 
@@ -77,8 +82,11 @@ def load_schemas():
         current_app.schema_info['message'] = str(e)
         return False
 
+
 def main():
     args = parse_args()
+    logging_config = return_config(args.verbose)
+    logging.config.dictConfig(logging_config)
     server = {
         'listen_host': settings.ServerHTTP.listen_host,
         'external_host': settings.ServerHTTP.external_host,

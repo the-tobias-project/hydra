@@ -2,6 +2,7 @@
 import logging
 import os
 import pickle
+import time
 
 # third party lib
 import h5py
@@ -17,32 +18,34 @@ from lib.client_registry import Registry
 from server.lib import plots
 
 
-
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
 
 
 def start_init_task():
+    global TIME
+    TIME = time.time()
     for client in Registry.get_instance().list_clients():
         Registry.get_instance().set_client_state(client['name'], Commands.INIT)
     networking.message_clients("init", env=app.config["ENV"])
 
 
-def store_positions(data):
+def store_positions(data, client_name):
     data = pickle.loads(data)
     chrom = data['CHROM']
     positions = data['POS']
     dsetname = "{}/positions".format(chrom)
     write_or_replace(store, dsetname, positions, np.uint32)
-    logging.info("{} loci in chromosome {}.".format(len(positions), chrom))
+    logging.info(f"{client_name} has {len(positions)} loci in chromosome {chrom}.")
+
 
 def store_counts(data, client_name):
     message = pickle.loads(data)
     n = message["n"]
-    logging.info('storing counts')
     if "START" in message:
         if "N" not in store.attrs:
             store.attrs["N"] = 0
+            logging.info('Storing counts.')
         store.attrs["N"] += n
     chrom = message["CHROM"]
     size = len(message["COUNTS"])
@@ -58,8 +61,7 @@ def store_counts(data, client_name):
     if "END" in message:
         Registry.get_instance().set_client_state(client_name, Commands.INIT_STATS)
         if Registry.get_instance().num_clients_in_state(Commands.INIT) == 0:
-            logging.info('Done getting init reports from clients')
-            logging.info('Telling clients to store stats')
+            logging.info('Transfering QC summary stats.')
             count_stats()
 
 
@@ -100,7 +102,9 @@ def count_stats():
 
     logging.info("Done with initialization")
     make_plots("QC_pre_filter.png")
+    logging.info(f"Initialization took roughly {time.time()-TIME:.1f} seconds.")
+
 
 def make_plots(outname):
-      logging.info("Generating QC plots")
-      plots.qc_plots(storePath, outname)
+    logging.info("Generating QC plots")
+    plots.qc_plots(storePath, outname)

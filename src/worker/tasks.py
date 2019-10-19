@@ -1,26 +1,21 @@
-import os
-import sys
-
 # stdlib
+import sys
+import os
+import logging
 import socket
 import time
 
 # third party lib
-#from flask_celeryext import create_celery_app
-#from celery import current_app
+from flask import current_app as app
+from worker import celery
 
 # internal lib
 from worker import task_init, task_qc, task_pca, task_asso
 
 sys.path.append(os.path.abspath('../lib'))
 sys.path.append(os.path.abspath('../client'))
-#app = Flask('__name__')
-#app.config["CELERY_BROKER_URL"] = Settings.redis_uri
-#app.config["CELERY_BACKEND_URL"] = Settings.redis_uri
-#app = create_celery_app(app)
-#celery = Celery('cws_queue', broker=Settings.redis_uri, backend=Settings.redis_uri)
-from worker import celery
-from flask import current_app as app
+logger = logging.getLogger("worker")
+
 
 @celery.task(name='tasks.hello')
 def hello():
@@ -29,10 +24,10 @@ def hello():
 
 @celery.task(name='tasks.caller')
 def caller(fn, a, b):
-    print(f'calling supplied function with two values {a} and {b}')
+    logger.info(f'Calling supplied function with two values {a} and {b}')
     result = fn(a, b)
     time.sleep(20)
-    print(f'And the result is {result}')
+    logger.info(f'And the result is {result}')
     return result
 
 
@@ -50,7 +45,7 @@ def dependent():
     'time_start': 1550479402.5393896, 'acknowledged': True, 'delivery_info': {'exchange': '',
     'routing_key': 'celery', 'priority': 0, 'redelivered': None}, 'worker_pid': 6973}]}
     """
-    print(f'Called a dependent function')
+    logger.info('Called a dependent function.')
     hostname = socket.gethostname()
     i = app.control.inspect()
     times_called = 0
@@ -59,14 +54,14 @@ def dependent():
         active_tasks = i.active()[f'celery@{hostname}']
         dependent_tasks = list(filter(lambda x: x['type'] == 'tasks.caller', active_tasks))
         if times_called == 1:
-            print('Remaining tasks that are still active:')
-            print(dependent_tasks)
+            logger.info('Remaining tasks that are still active:')
+            logger.info(f"{dependent_tasks}")
         if len(dependent_tasks) > 0:
-            print('Waiting on tasks to finish...')
+            logger.info('Waiting on tasks to finish...')
             time.sleep(1)
         else:
             break
-    print('Broke free!')
+    logger.info('Broke free!')
 
 
 @celery.task(name='tasks.init_store')
@@ -107,19 +102,18 @@ def pca_projection(data, client_config):
 
 @celery.task(name='tasks.regression_init')
 def initialize_logistic_reg(client_config, env):
-    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
+    task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
 
 
 @celery.task(name='tasks.asso')
 def compute_logistic_reg(message, client_config):
-    print("Running regression")
     lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config)
     lr_agg.update(message, client_config)
 
 
 @celery.task(name='tasks.adjust')
 def adjust_covariates(message, client_config, env):
-    print("adjusting covariates")
+    logger.info("Adjusting covariates.")
     lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
     lr_agg.global_standardize(message, client_config)
 

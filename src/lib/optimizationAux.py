@@ -1,6 +1,6 @@
-# Optimization helper functions 
+# Optimization helper functions
 
-import numpy as np 
+import numpy as np
 from sklearn.metrics import log_loss
 from numpy import sum,maximum, exp, log, log1p
 from scipy.optimize import fmin_l_bfgs_b as bfgs
@@ -37,7 +37,7 @@ eye     = np.eye
 empty   = np.empty
 lstsq   = _umath_linalg.lstsq_m
 
-# ADMM helpers 
+# ADMM helpers
 #@nb.jit(nb.types.Tuple((nb.f8, nb.f8[:,:])) (nb.f8[:], nb.f8[:,:], nb.f8[:,:],nb.f8[:,:],nb.f8, nb.i8), locals={'v':nb.f8[:,:],
 #  'eCx': nb.f8[:,:], 'f': nb.f8, 'g': nb.f8[:,:], 'y':nb.f8[:,:]})
 def l2_log(x, C, z, u, rho, n):
@@ -51,12 +51,12 @@ def l2_log(x, C, z, u, rho, n):
 
 def bfgs_update(C, u, z, rho, x0):
   n = len(x0)
-  args = (C, z, u, rho,n) 
+  args = (C, z, u, rho,n)
   # bfgs(func, x0, args, bounds, callback)
   return bfgs(l2_log, x0, args=args, bounds=None, callback=callback)
 
 def bfgs_gutted(C, u, z, rho, x0):
-   args = (C, z, u, rho) 
+   args = (C, z, u, rho)
    fun = MemoizeJac(l2_log)
    jac = fun.derivative
    return _minimize_lbfgsb(fun, x0, args, jac, None, None, 10,
@@ -108,7 +108,7 @@ def simple_newton (C, u, z, rho, x, n):
     TOLERANCE = 1e-5
     I = np.eye(n)
     umz = sub(u,z)
-    
+
     for i in range(max_iter):
         v = add(x,umz)
         eCx = exp(dot(C,x))
@@ -153,13 +153,13 @@ def other_newton (C, u, z, rho, x, n):
     eCx = exp(dot(C,x))
     f = umr_sum(log1p(eCx), None, None, None, False) + rho * 0.5 * umr_sum(mul(v,v), None, None, None, False)
     #f = sum(log1p(eCx)) + rho * 0.5 * sum(mul(v,v))
-    
+
     for i in range(max_iter):
         logitECX = div(eCx, add(1,eCx))
         g = dot(C.T, logitECX) + rho * v
         g = g[:, np.newaxis]
         #H = dot(dot(C.T,  np.diag(logitECX/(1 + eCx))), C) + rho*I
-        H = hess(C,logitECX/(1 + eCx),n,m, rho) 
+        H = hess(C,logitECX/(1 + eCx),n,m, rho)
         dx = lstsq(-H, g, 1e-4, signature='ddd->ddid')[0]
         dfx = dot(g.T, dx)
         if npabs(dfx) < TOLERANCE:
@@ -179,7 +179,6 @@ def other_newton (C, u, z, rho, x, n):
         if (f-fnew) < TOLERANCE:
             break
         f = fnew
-        print(f)
     return x
 
 @nb.jit(nb.f8[:, :](nb.f8[:,:], nb.f8[:], nb.i8, nb.i8, nb.f8),

@@ -1,6 +1,7 @@
 # stdlib
 import argparse
 import logging
+import logging.config
 import signal
 import sys
 import os
@@ -13,6 +14,7 @@ from client.lib import shared
 from lib import settings
 import worker
 from worker import factory
+from lib.logging_config import return_client_config
 
 # Routes
 
@@ -100,7 +102,7 @@ def configure_client(client, args):
 
 def register_self(client, server_url):
     url = f'{server_url}/clients'
-    print(url)
+    logging.info(f"Server url: {url}")
     try:
         registered_clients = requests.get(url).json()
         self_name = client['name']
@@ -138,7 +140,9 @@ def teardown(signum, frame, app):
 def main():
     args = parse_args()
     client = next(filter(lambda x: x['name'] == args.name, settings.ClientHTTP.clients))
-    setup_logging(args.name)
+    logging_config = return_client_config(args.name+".log")
+    logging.config.dictConfig(logging_config)
+
     app = factory.create_app(celery=worker.celery)
     app.config.update(
         CELERY_BROKER_URL='redis://localhost:6379',

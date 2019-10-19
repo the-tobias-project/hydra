@@ -8,10 +8,7 @@ import traceback
 from plinkio import plinkfile
 import numpy as np
 import h5py
-import pdb
 import json
-
-# In house lib
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -23,7 +20,7 @@ class NumpyEncoder(json.JSONEncoder):
             return int(obj)
         elif isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
             return float(obj)
-        elif isinstance(obj, (np.ndarray,)): #### This is the fix
+        elif isinstance(obj, (np.ndarray,)):  # This is the fix
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
@@ -35,7 +32,7 @@ def encode(message, client_name=None):
             message['client_name'] = client_name
         j = json.dumps(message, cls=NumpyEncoder).encode('utf-8')
         return j
-    except:
+    except Exception:  # srsly E722?
         print('oh nodes!')
         print(traceback.format_exc())
 
@@ -54,7 +51,7 @@ def write_or_replace(group, name, val, dtype=None):
         dtype = val.dtype
     else:
         val = val.astype(dtype)
-    dset = group.create_dataset(name, dtype=dtype, data=val)
+    group.create_dataset(name, dtype=dtype, data=val)
 
 
 def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
@@ -71,11 +68,9 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
     edge_offset = 100
     causal_mut_index = np.linspace(
         edge_offset, p-edge_offset, multigenecity, dtype=int)
-    gen_effect_size_unnormalized = {item:
-        np.random.normal(loc=0, scale=float(h)/np.sqrt(multigenecity))
-        for item in causal_mut_index}
-    causal_mutations = set()
-    mutation_meta = {}
+    gen_effect_size_unnormalized = {
+            item: np.random.normal(loc=0, scale=float(h)/np.sqrt(multigenecity))
+            for item in causal_mut_index}
     prs = np.zeros(n)
     for i, variant in enumerate(locus_list):
         row = plink_file.next()
@@ -89,8 +84,8 @@ def add_pheno(plink_in, multigenecity, out, h=0.85, p_cases=0.5):
     env_rs_unnormalized = np.random.normal(
         loc=0, scale=np.sqrt(1-h**2), size=n)
     gen_effect_size = h * (prs - np.mean(prs)) / np.std(prs)
-    env_effect_size = np.sqrt(1-h**2) * (env_rs_unnormalized
-        - np.mean(env_rs_unnormalized)) / np.std(env_rs_unnormalized)
+    env_effect_size = (np.sqrt(1-h**2)
+                       * (env_rs_unnormalized - np.mean(env_rs_unnormalized)) / np.std(env_rs_unnormalized))
     burden = gen_effect_size + env_effect_size
     sorted_i = np.argsort(burden)[::-1]
     ncases = int(n * p_cases)
@@ -136,29 +131,28 @@ def compare_pca(plinkPCA, store_name, dsets_list):
         k = len(sigmas)
     sigmasMatch = np.isclose(sigmas, plinkSigmas, rtol=1e-4, atol=1e-6).all()
     del plinkSigmas, sigmas
-    plinkVals = np.loadtxt(plinkPCA+'.eigenvec', usecols=range(2,2+k))
+    plinkVals = np.loadtxt(plinkPCA+'.eigenvec', usecols=range(2, 2+k))
     valsMatch = True
     index_new, index_old = 0, 0
     for dset in dsets_list:
         with h5py.File(dset, 'r') as store:
             vals = store['meta/pca_u'].value
             index_new += vals.shape[0]
-            valsMatch * np.isclose(plinkVals[index_old:index_new,:], vals, rtol=1e-4, atol=1e-6).all()
+            valsMatch * np.isclose(plinkVals[index_old:index_new, :], vals, rtol=1e-4, atol=1e-6).all()
             index_old = index_new
     return valsMatch * sigmasMatch
 
 
 def compare_regression(plinkRegression, store_name, dset_name="results"):
     converter = lambda x: np.nan if x == b'NA' else float(x)
-    plinkResults = np.loadtxt(plinkRegression, usecols=[0, 6,7,8], skiprows=1, 
-        converters={6: converter, 7: converter, 8: converter})
+    plinkResults = np.loadtxt(plinkRegression, usecols=[0, 6, 7, 8], skiprows=1,
+                              converters={6: converter, 7: converter, 8: converter})
     with h5py.File(store_name, 'r') as store:
-        pdb.set_trace()
         for key in store:
             if key != "meta":
                 results = store[key+"/{}".format(dset_name)].value
                 res = np.array([i for subset in results for i in subset])
-                plinkSubset_ind = plinkResults[:,0] == int(key)
+                plinkSubset_ind = plinkResults[:, 0] == int(key)
                 plinkSubset = plinkResults[plinkSubset_ind, :]
                 del plinkSubset_ind
 
