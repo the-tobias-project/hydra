@@ -83,43 +83,43 @@ def start_local_qc_task(filters, prefix=None):  # Filter based on local info
             val = float(filters[Options.MPS])
             tokeep = np.logical_and(tokeep, mr.value < val)
         logging.info("In chromosome {}, {} snps were deleted and {} snps remain".format(chrom,
-            tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
+                     tokeep.shape[0] - np.sum(tokeep), np.sum(tokeep)))
         #  Delete or tag the filtered locations
         if prefix is None:
             pos_vals, counts_vals = pos.value[tokeep], counts.value[tokeep]
             mr_vals = mr.value[tokeep]
             del group["positions"], group["counts"], group["missing_rates"]
-            d1 = group.require_dataset("positions", pos_vals.shape
-                , dtype = pos_vals.dtype)
+            d1 = group.require_dataset("positions", pos_vals.shape,
+                                       dtype=pos_vals.dtype)
             d1[:] = pos_vals
-            d2 = group.require_dataset("counts", counts_vals.shape
-                , dtype=counts_vals.dtype)
+            d2 = group.require_dataset("counts", counts_vals.shape,
+                                       dtype=counts_vals.dtype)
             d2[:] = counts_vals
-            d3 = group.require_dataset("missing_rates", mr_vals.shape
-                , dtype=mr_vals.dtype)
+            d3 = group.require_dataset("missing_rates", mr_vals.shape,
+                                       dtype=mr_vals.dtype)
             d3[:] = mr_vals
             del pos_vals, counts_vals, mr_vals
-            af_vals, hwe_vals= af.value[tokeep], hwe.value[tokeep]
+            af_vals, hwe_vals = af.value[tokeep], hwe.value[tokeep]
             del group["hwe"], group["allele_freq"]
-            d4 = group.require_dataset("hwe", hwe_vals.shape
-                , dtype=hwe_vals.dtype)
+            d4 = group.require_dataset("hwe", hwe_vals.shape,
+                                       dtype=hwe_vals.dtype)
             d4[:] = hwe_vals
-            d5 = group.require_dataset("allele_freq", af_vals.shape
-                , dtype=af_vals.dtype)
+            d5 = group.require_dataset("allele_freq", af_vals.shape,
+                                       dtype=af_vals.dtype)
             d5[:] = af_vals
         else:
             n = np.sum(tokeep)
             ones = np.ones(n, dtype=bool)
-            d1 = group.require_dataset(prefix + "passed", ones.shape
-                , dtype=bool)
+            d1 = group.require_dataset(prefix + "passed", ones.shape,
+                                       dtype=bool)
             d1[:] = ones
             pos_vals = pos.value[tokeep]
-            d2 = group.require_dataset(prefix + "positions", pos_vals.shape
-                , dtype=pos_vals.dtype)
+            d2 = group.require_dataset(prefix + "positions", pos_vals.shape,
+                                       dtype=pos_vals.dtype)
             d2[:] = pos_vals
             af_vals = af.value[tokeep]
-            d3 = group.require_dataset(prefix + "allele_freq"
-                , af_vals.shape, dtype=af_vals.dtype)
+            d3 = group.require_dataset(prefix + "allele_freq",
+                                       af_vals.shape, dtype=af_vals.dtype)
             d3[:] = af_vals
 
 

@@ -20,6 +20,7 @@ options = {"swagger_ui": True}
 app = connexion.FlaskApp(__name__, options=options)
 BASE_SCHEMA = 'base.yml'
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='CWS server')
     parser.add_argument('--port', type=int, help='[OPTIONAL] Override the default port')

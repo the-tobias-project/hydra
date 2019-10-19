@@ -105,16 +105,11 @@ def return_worker_config(logname):
             }
         }
     logging_config["loggers"] = {
-            #"celery": {
-            #    "level": "INFO",
-            #    "handlers":["info_file_handler"],
-            #    "propagate": False
-            #    },
             "worker": {
                 "level": "INFO",
-                "handlers":["info_file_handler", "console"],
+                "handlers": ["info_file_handler", "console"],
                 "propagate": False
-                }
+            }
         }
     logging_config["root"] = {
             "level": "INFO",

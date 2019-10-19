@@ -72,7 +72,7 @@ class CovarianceAggregator(object):
             CovarianceAggregator.__instance = self
 
     @staticmethod
-    def get_instance(num_clients, win_size):##TODO this is dangerous. If num_clients or win_size changes
+    def get_instance(num_clients, win_size):  # #TODO this is dangerous. If num_clients or win_size changes
         if CovarianceAggregator.__instance is None:
             CovarianceAggregator(num_clients, win_size)
         return CovarianceAggregator.__instance
@@ -97,12 +97,11 @@ class CovarianceAggregator(object):
                 self.sumSq[key] = val[1]
                 self.cross[key] = val[2]
         self.counter += 1
-        if self.counter == self.num_clients: # Everyone reported
+        if self.counter == self.num_clients:  # Everyone reported
             message = {}
             for key, val in msg.items():
                 corr_tot = corr(self.sumLin[key], self.sumSq[key],
                                 self.cross[key])
-                group = store[key]
                 tokeep = store[f"{key}/PCA_passed"].value
                 end = min(self.r1 + self.r0, len(tokeep))
                 maf = store["{}/PCA_allele_freq".format(key)].value[
@@ -112,23 +111,23 @@ class CovarianceAggregator(object):
                 n = maf.shape[0]
                 unfiltered = np.ones((n, ), dtype=bool)
                 while True:
-                    #length_of_window = np.sum(tokeep[self.r0:end)
+                    # length_of_window = np.sum(tokeep[self.r0:end)
                     for i, snp1 in enumerate(unfiltered):
                         if not snp1:  # already filtered
                             continue
                         else:
                             for j in range(i+1, n):
                                 snp2 = unfiltered[j]
-                                if not snp2: # if it didn't pass the filters
+                                if not snp2:  # if it didn't pass the filters
                                     continue
-                                elif corr_tot[i,j] ** 2 > self.thresh:
+                                elif corr_tot[i, j] ** 2 > self.thresh:
                                     if maf[i] > (maf[j] * (1.0 +
                                                            Settings.kSmallEpsilon)):
                                         unfiltered[i] = False
                                     else:
                                         unfiltered[j] = False
                                     break
-                    r2 = corr_tot[unfiltered,:][:,unfiltered]
+                    r2 = corr_tot[unfiltered, :][:, unfiltered]
                     if np.max(r2**2) < self.thresh:
                         break
                 tokeep[self.r0:end][tokeep[self.r0:end]] = unfiltered
@@ -147,6 +146,7 @@ class CovarianceAggregator(object):
             self.r0 += self.r2
             self.sumLin, self.sumSq, self.cross = dict(), dict(), dict()
 
+
 class Position_reporter(object):
     __instance = None
 
@@ -159,7 +159,7 @@ class Position_reporter(object):
             Position_reporter.__instance = self
 
     @staticmethod
-    def get_instance(args={}):  ##TODO this is dangerous. If num_clients or win_size changes
+    def get_instance(args={}):  # #TODO this is dangerous. If num_clients or win_size changes
         if Position_reporter.__instance is None:
             Position_reporter(args)
         return Position_reporter.__instance
@@ -169,17 +169,15 @@ class Position_reporter(object):
             self.incrementor -= 1
         else:
             for chrom in store:
-                    if chrom == "meta":
-                        continue
-                    data = {}
-                    data[chrom] = store[f"{chrom}/PCA_passed"].value
-                    msg = pickle.dumps(data)
-                    networking.message_clients("pca/pcapos", data=msg, env=app.config["ENV"])
+                if chrom == "meta":
+                    continue
+                data = {}
+                data[chrom] = store[f"{chrom}/PCA_passed"].value
+                msg = pickle.dumps(data)
+                networking.message_clients("pca/pcapos", data=msg, env=app.config["ENV"])
             self.incrementor = len(clients)
-            time.sleep(ServerHTTP.wait_time) #TODO fix this hack. Give time for clients to finish
+            time.sleep(ServerHTTP.wait_time)  # #TODO fix this hack. Give time for clients to finish
             networking.message_clients("pca/cov", data=msg, env=app.config["ENV"])
-
-
 
 
 def report_pos(client_names=None):
@@ -190,8 +188,9 @@ def report_pos(client_names=None):
         data[chrom] = store[f"{chrom}/PCA_passed"].value
         msg = pickle.dumps(data)
         networking.message_clients("pca/pcapos", data=msg, env=app.config["ENV"])
-    time.sleep(ServerHTTP.wait_time) #TODO fix this hack. Give time for clients to finish
+    time.sleep(ServerHTTP.wait_time)  # #TODO fix this hack. Give time for clients to finish
     networking.message_clients("pca/cov", data=msg, env=app.config["ENV"])
+
 
 def store_covariance(client_name, data):
     # store the chunks in the store. build on them
@@ -205,9 +204,9 @@ def store_covariance(client_name, data):
     mat = msg["MAT"]
     cov_name = f"{ch1}_{ch2}"
     if cov_name in group:
-        #mat += group[cov_name].value
+        # mat += group[cov_name].value
         stored = group[cov_name]
-        stored[:,:] += mat
+        stored[:, :] += mat
     else:
         group.create_dataset(cov_name, data=mat)
     if "E" in msg:
@@ -249,15 +248,15 @@ using chromosomes: {chroms}""")
         sigma = np.array(sigma)
         sigma[sigma < 0] = 0
         logging.info(f"Top eigenvalues are {sigma}")
-        meta.create_dataset('Sigmas', data = sigma)
-        meta.create_dataset('Vs', data = v)
+        meta.create_dataset('Sigmas', data=sigma)
+        meta.create_dataset('Vs', data=v)
     else:
         logging.info("Eigenvalue decomposition has already been done.")
         sigma = meta["Sigmas"].value
         v = meta["Vs"].value
     sigma = np.sqrt(sigma) * np.sqrt(v.shape[0])
     inv_sigma = sigma.copy()
-    inv_sigma[inv_sigma>0] = 1 / inv_sigma[inv_sigma > 0]
+    inv_sigma[inv_sigma > 0] = 1 / inv_sigma[inv_sigma > 0]
     msg = {"ISIG": inv_sigma, "V": v, "CHROMS": chroms}
     msg = pickle.dumps(msg)
     networking.message_clients("pca/eig", data=msg, env=app.config["ENV"])

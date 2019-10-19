@@ -39,6 +39,7 @@ class Thresholds(object):
     # Association Options
     ASSO_pcs = 10
 
+
 class Options(object):
     # HELP = Commands.HELP
     INIT = Commands.INIT

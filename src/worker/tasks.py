@@ -102,7 +102,7 @@ def pca_projection(data, client_config):
 
 @celery.task(name='tasks.regression_init')
 def initialize_logistic_reg(client_config, env):
-    lr_agg = task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
+    task_asso.LogisticAdmm.get_instance(range(2, 4), 10, client_config, env)
 
 
 @celery.task(name='tasks.asso')

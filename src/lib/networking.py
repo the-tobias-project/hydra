@@ -1,6 +1,3 @@
-# stdlib
-import logging
-
 # third party lib
 from flask import jsonify, make_response
 import requests
@@ -20,14 +17,14 @@ def create_response(code, msg=None):
     :param msg:             Any message to be included in the response
     """
     status = 'OK'
-    if code is not 200:
+    if code != 200:
         status = 'error'
     if msg is None:
-        if code is 200:
+        if code == 200:
             msg = 'success'
-        elif code is 404:
+        elif code == 404:
             msg = 'Not found'
-        elif code is 400:
+        elif code == 400:
             msg = 'User error; please check request'
         else:
             msg = 'Unknown error'
@@ -60,6 +57,8 @@ def message_clients(address, client_name=None, args=None, env='production', data
         client_list = list(filter(lambda x: x["name"] == client_name, clients))
     for client in client_list:
         if args is None:
-            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}', data=data)
+            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}',
+                          data=data)
         else:
-            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}', params=args, data=data)
+            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}',
+                          params=args, data=data)

@@ -7,17 +7,17 @@ from flask import current_app as app
 
 # Internal lib
 from lib import networking
+from worker.tasks import celery as celery_client
 
 bp = Blueprint('root', __name__, url_prefix='/api')
-#celery_client = Celery(broker=Settings.redis_uri, backend=Settings.redis_uri)
-from worker.tasks import celery as celery_client
+
 
 @bp.route('/init', methods=['POST'])
 def init():
     logging.info('Got command to initialize')
     client_name = app.config['client']['name']
     celery_client.send_task('tasks.init_store',
-            [app.config['client'], app.config["ENV"]],
+                            [app.config['client'], app.config["ENV"]],
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
@@ -38,9 +38,10 @@ def init_stats():
 def delayed():
     logging.info('called delayed celery entry point')
     client_name = app.config['client']['name']
-    promise = celery_client.send_task('tasks.caller', [adder_fn, 1, 2],
-                                      serializer='pickle',
-                                      queue=client_name)
+    # promise = celery_client.send_task('tasks.caller', [adder_fn, 1, 2],
+    celery_client.send_task('tasks.caller', [adder_fn, 1, 2],
+                            serializer='pickle',
+                            queue=client_name)
     # resolution = promise.wait()  # answer is in here, if the celery backend is defined.  This will block.
     return networking.create_response(200)
 
@@ -159,7 +160,6 @@ def compute_cost():
                             serializer='pickle',
                             queue=client_name)
     return networking.create_response(200)
-
 
 
 def adder_fn(a, b):

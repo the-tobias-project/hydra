@@ -20,6 +20,7 @@ from lib.corr import process_plink_row
 
 logger = logging.getLogger("worker")
 
+
 def init_store(client_config, env):
     pfile = client_config['plinkfile']
     store_name = shared.get_plink_store(pfile)
@@ -44,7 +45,7 @@ def clear_consistency_flag(fname):
 
 
 def report_file_info(store_name, client_config, env):
-    #TODO make QC not actually delete stuff
+    # TODO make QC not actually delete stuff
     with h5py.File(store_name, 'a') as store:
         store.attrs['has_global_AF'] = False
         store.attrs['has_centering'] = False
@@ -115,11 +116,11 @@ def plinkToH5(client_config, env):
                                      dtype=np.uint)
                     write_or_replace(current_group, 'rsids', rsids)
                     write_or_replace(current_group, 'counts', all_counts,
-                        np.uint32)
+                                     np.uint32)
 
                     send_positions_to_server(positions, current_chr, client_config, env)
                     positions = []
-                    rsid = []
+                    # rsid = []
                     all_counts = []
                 current_chr = locus.chromosome
                 if current_chr == 23:
@@ -129,8 +130,8 @@ def plinkToH5(client_config, env):
             counts, geno = process_plink_row(row, genotypes)
             # This should be a try except
             try:
-                dset = current_group.create_dataset(pos, data=geno)
-            except:
+                current_group.create_dataset(pos, data=geno)
+            except Exception:
                 logger.error(f"Cannot write position: chr{locus.chromosome} {pos}")
             rsids.append(locus.name.encode('utf8'))
             positions.append(pos)

@@ -1,5 +1,4 @@
 # stdlib
-import logging
 import os
 
 # internal lib
@@ -30,8 +29,7 @@ def get_plink_store(pfile):
 
 def get_covar_file(pfile):
     dirname, basename = os.path.split(pfile)
-    prefix = os.path.basename(dirname)
-    #return covar_file
+    # return covar_file
     path = os.path.join(dirname, "HydraPheno")
     phenopath = os.path.abspath(path)
     return phenopath

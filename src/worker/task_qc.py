@@ -1,6 +1,5 @@
 # stdlib
 import pickle
-import time
 import logging
 
 # third party lib
@@ -15,6 +14,7 @@ from lib.utils import write_or_replace
 from lib.settings import QCFilterNames, Settings
 
 logger = logging.getLogger("worker")
+
 
 def init_qc(message, client_config, env):
     logger.info("Pefroming QC.")
@@ -33,8 +33,8 @@ def run_QC(filters, client_config, prefix, remove=True, env="production"):
                 tokeep = np.logical_and(tokeep, vals > thresh)
             else:
                 tokeep = np.logical_and(tokeep,
-                    np.logical_and(vals > thresh - Settings.kSmallEpsilon,
-                        (1.0-vals) > thresh - Settings.kSmallEpsilon))
+                                        np.logical_and(vals > thresh - Settings.kSmallEpsilon,
+                                                       (1.0-vals) > thresh - Settings.kSmallEpsilon))
         return tokeep
 
     def replace_dataset(tokeep, dset_name, return_deleted=False):
@@ -55,23 +55,23 @@ def run_QC(filters, client_config, prefix, remove=True, env="production"):
             tokeep = np.ones_like(positions, dtype=bool)
             tokeep = find_what_passes(QCFilterNames.QC_HWE, "hwe", tokeep)
             tokeep = find_what_passes(QCFilterNames.QC_MAF, "MAF",
-                tokeep, doubleSided=True)
+                                      tokeep, doubleSided=True)
             if QCFilterNames.QC_MPS in filters:
                 filters[QCFilterNames.QC_MPS] = 1 - filters[QCFilterNames.QC_MPS]
-            tokeep  = find_what_passes(QCFilterNames.QC_MPS, "not_missing_per_snp", tokeep)
+            tokeep = find_what_passes(QCFilterNames.QC_MPS, "not_missing_per_snp", tokeep)
             logger.info(f"After filtering {chrom}, {np.sum(tokeep)} snps remain")
-            if remove: # Delete what doesn't pass
+            if remove:  # Delete what doesn't pass
                 replace_dataset(tokeep, 'hwe')
                 replace_dataset(tokeep, 'VAR')
                 replace_dataset(tokeep, 'MAF')
                 replace_dataset(tokeep, 'not_missing_per_snp')
                 deleted = replace_dataset(tokeep, 'positions',
-                    return_deleted=True)
+                                          return_deleted=True)
                 for snp in deleted:
                     snp = str(snp)
                     if snp in group:
                         del group[snp]
-            else: # Store what has been tagged
+            else:  # Store what has been tagged
                 pass_mask = prefix + "_mask"
                 pos_mask = prefix + "_positions"
                 if pass_mask in group:
@@ -90,5 +90,3 @@ def run_QC(filters, client_config, prefix, remove=True, env="production"):
         networking.respond_to_server('api/tasks/QC/FIN', "POST", b'', client_name, env)
     else:
         networking.respond_to_server('api/tasks/PCA/FIN', "POST", b'', client_name, env)
-
-
