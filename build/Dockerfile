@@ -1,6 +1,5 @@
 FROM continuumio/miniconda3
 
-RUN conda update -y conda -n root 
 RUN conda create -n env python=3.6.8
 RUN echo "source activate env" > ~/.bashrc
 ENV PATH /opt/conda/envs/env/bin:$PATH
