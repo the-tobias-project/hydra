@@ -22,7 +22,17 @@ We require 2 shell terminals for each center and one shell terminal for the serv
 In the shell screen to be used for server build the container images: 
 
 ```bash
-bash-3.2$ bash  up.sh
+bash-3.2$ bash up.sh
+```
+
+When the setup is compelete, you should see  
+```bash
+Creating hydra_app_1   ... done  
+Creating Center2       ... done 
+Creating Center1       ... done
+Creating hydra_redis_1 ... done
+Creating Center3       ... done 
+root@hydra:/app#
 ```
 
 This script creates the containers and the network. It also initializes 3 containers for the three centers and attaches the server container to the current shell terminal. You should see the prompt change to `root@hydra`. Alternatively, you can pull the image and initialize the server as follows:
@@ -44,8 +54,15 @@ root@hydra:/app/src# python -m server --dev 1
 ```
 Head over to `http://localhost:9001/api/ui/` in a browser to monitor and control the server. You should see a page similar to the one in Figure 1 below. 
 
+The server invoked without any arguments assumes the default configuration inside [`src/lib/settings.py`](src/lib/settings.py). These defaults can be overriden by either modifying that file directly, or adding arguments to the command line invocation. Details can be accessed by calling `python -m server --help`. Here we are using the `--dev` flag since all communications are happning on the same computer. 
 
+
+
+### Running the clients: (Time: ~2 mins)
+ 
 Next, we will setup all the clients. If `up.sh` was used, these containers have been made and started already so simply attach to each center and run the client...
+
+To connect to a running docker container with a new terminal, assuming the container name is `Center1`, run:  
 
 ```bash
 bash-3.2$ docker attach Center1
@@ -67,7 +84,10 @@ root@hydra-client:/app/src# python -m client --name=Center1 --plinkfile=/app/dat
 
 You should see a confirmation of registration on the client side and the server terminal. You can also check to see all the registered clients in the UI. 
 
+### Running the worker: (Time: 2 mins)
+
 The last step in the setup is starting up the workers. We need to connect to each container and run a separate worker. 
+The worker needs to be associated with the client it's serving - this is done by giving both the same name.  Here we continue with the `Center1` example.   
 
 ```bash
 root@hydra-client: docker exec -it Center1 "bash"
@@ -80,7 +100,15 @@ Change "Center1" as appropriate for each container.
 
 ## GWAS
 
+To Summarize the previous steps. After clarifying the names and setting up the settings.py file, each silo independently needs to run the `client` side as well as a Celery worker. On the study-enter side, the analyst will need to setup the "server" before the clients start. From now on, **there is no further need for human intervention on the data silo side**.
+
 Now we are ready to run a GWAS. This can be done through the UI or using `curl` commands. In the UI, click on "Jobs->/tasks/{task_name}" (see Figure 1).
+
+The analyst can check to see if all data silos have connected. This can be done by looking at the terminal messages, or in the UI under [Client->/clients, after pressing "Try it out"]. Once all silos are connected we can start the process.
+
+### Initialization: (Time: ~5 mins): 
+
+The bulk of this step is transforming the data from plink format to hdf format. It is one of the slower parts of the process but needs to be done only once for each dataset (i.e. once the format has been changed, the conversion is not needed in the future uses of the data). 
 
 ![UI](https://github.com/apoursh/HYDRA/blob/master/example/figures/Starter_image.png)
 
@@ -88,11 +116,31 @@ Select "INIT" from the drop-down list of task_names and press "Try it out!" (see
 
 ![Starting](https://github.com/apoursh/HYDRA/blob/master/example/figures/Tasks.png)
 
-You should see a confirmation of this command on the server side and soon after on the client side. The worker will provide periodic updates as it works through the initialization steps. Once the process is over you should see an automatically generated figure `QC_pre_filter.png` that can be helpful for filteration (figure 3, left). Proceed by running QC in the same way. You should see a similar post-QC image `QC_post_filter.png`.
+You should see a confirmation of this command on the server side and soon after on the client side. The worker will provide periodic updates as it works through the initialization steps. Once the process is over you should see an automatically generated figure `src/QC_pre_filter.png` that can be helpful for filteration (figure 3, left). Proceed by running QC in the same way. You should see a similar post-QC image `QC_post_filter.png`.
+
+### QC: (Time: ~3 seconds)
+
+Next, we will specify QC filters and thresholds. At the moment, a handful of most common filters are implemented. In the UI, under `Jobs-> /tasks/{task_name}` (same place as before) change the "task_name" from "INIT" to "QC". Thresholds can be specified in the "thresholds" box. `{"QC_HWE": "1e-6", "QC_MAF": ".05", "QC_MPS": ".05"}` (Hardy-Weinberg equilibrium, minor allele frequency andmissing per snp filters). Since there is no missing values, the last filter is superficial. Once the thresholds have been specified, press "Try it out!". This step should take a couple of seconds. 
 
 ![QC](https://github.com/apoursh/HYDRA/blob/master/example/figures/QC.png)
 
-Finally you can proceed with PCA and ASSO.
+After filtering a post-filteration QC figure is generated at `src/QC_post_filter.png`
 
+### PCA (Time: ~2 mins): 
+
+Change the "task_name" to "PCA". New filter thresholds can be specified using the PCA_ instead of QC_ prefix. For this example, we will input the following parameters in the "thresholds" box: `{"PCA_ld_window": "50",  "PCA_maf": ".1", "PCA_ld_threshold": ".2"}`  
+
+The top eigenvalues reported should be: [237.87236   105.400955   31.763533   24.018646    5.637906    4.9887977   4.300205    3.9306588   3.8040369   3.597505 ]
 
 ![Manhattan](https://github.com/apoursh/HYDRA/blob/master/example/figures/manhattan_plot.png)
+
+Note that in this small example, only a ~4k snps were used to construct the PCs. In a typical application, this step is fairly memory intensive on the analyst's side (~80 GB for the example provided in the manuscript).
+
+### Association (Time: ~3 mins)
+
+Change the "task_name" to "ASSO". In this step, we will use 4 PCs as covariates. You can use a separate "covariates" file if needed. For this example, we will only use the top 4 pcs as covariates.  
+In the thresholds box, type `{"ASSO_pcs": "4"}` and press  "Try it out!"
+
+At the end of this step, you can find a Manhattan plot in `src/manhattan_plot.png`. The coefficients and pvalues are written to `src/manhattan_plot.txt`. 
+
+At the end of this step, we are done and can exit the server/clients/workers with control + c. a
