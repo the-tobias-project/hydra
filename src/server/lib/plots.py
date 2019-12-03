@@ -85,8 +85,7 @@ def manhattan_plot(plinkFile, outfile):
     ax, fig = manhattan(pos, pval, chromosome, alpha=.7)
     plt.savefig(outfile)
 
-
-def manhattan(positions, y, chroms, ax=None, alpha=.7, **kwargs):
+def manhattan(positions, y, chroms, ax=None, alpha=.7, log_trans=True, **kwargs):
     sb.set(font_scale=1)
     sb.set_style("white")
     sb.despine(left=True)
@@ -98,7 +97,8 @@ def manhattan(positions, y, chroms, ax=None, alpha=.7, **kwargs):
         tot += position[-1]
         tmp = y[i]
         tmp[tmp == 0] = _eps/10
-        y[i] = -np.log10(tmp)
+        if log_trans:
+            y[i] = -np.log10(tmp)
     edge_clearance = .01
     fig, ax = plt.subplots(figsize=(12, 6))
     tick_pos = []

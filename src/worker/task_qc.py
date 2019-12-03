@@ -52,7 +52,11 @@ def run_QC(filters, client_config, prefix, remove=True, env="production"):
                 continue
             group = store[chrom]
             positions = group['positions'].value
-            tokeep = np.ones_like(positions, dtype=bool)
+            if "QC_mask" in group:
+                tokeep = group["QC_mask"].value
+            else:
+                tokeep = np.ones_like(positions, dtype=bool)
+
             tokeep = find_what_passes(QCFilterNames.QC_HWE, "hwe", tokeep)
             tokeep = find_what_passes(QCFilterNames.QC_MAF, "MAF",
                                       tokeep, doubleSided=True)

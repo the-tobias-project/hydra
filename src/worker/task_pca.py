@@ -87,15 +87,17 @@ def store_filtered(message, client_config):
     msg = pickle.loads(message)
     with h5py.File(shared.get_plink_store(pfile), 'a') as store:
         for chrom, val in msg.items():
-            mask = store["{}/PCA_mask".format(chrom)]
-            if "non_ld_mask" not in store[chrom]:
-                pcmask = mask.value
-                dset = store.require_dataset(f"{chrom}/non_ld_mask", pcmask.shape, dtype=pcmask.dtype)
-                dset[:] = pcmask
-            else:
-                pcmask = store[f"{chrom}/non_ld_mask"].value
-                pcmask[pcmask] = val
-                mask[:] = pcmask
+            mask = store[f"{chrom}/PCA_mask"].value
+            mask[mask] = val
+            write_or_replace(store[f"{chrom}"], 'PCA_mask', val=mask)
+            #if "non_ld_mask" not in store[chrom]:
+            #    pcmask = mask.value
+            #    dset = store.require_dataset(f"{chrom}/non_ld_mask", pcmask.shape, dtype=pcmask.dtype)
+            #    dset[:] = pcmask
+            #else:
+            #    pcmask = store[f"{chrom}/non_ld_mask"].value
+            #    pcmask[pcmask] = val
+            #    mask[:] = pcmask
 
 
 def report_cov(client_config, env):
@@ -142,7 +144,6 @@ def report_cov(client_config, env):
                 if ch1 == chroms[-1] and ch2 == chroms[-1]:
                     msg["E"] = True
                 msg = pickle.dumps(msg)
-                # time.sleep(1)
                 networking.respond_to_server('api/tasks/PCA/COV', 'POST', msg, client_config['name'], env)
         logger.info(f"Final size will be {size}")
 
