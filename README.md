@@ -1,7 +1,7 @@
 # HyDRA
 Software for decentralized GWAS
 
-HyDRA is on the cloud! Visit [the cloud instructions](https://github.com/guardian-network/hydra/tree/cloud). 
+HyDRA is on the cloud! Visit [the cloud instructions](https://github.com/guardian-network/hydra/tree/azure/cloud). 
 
 ## Tutorial  
 
