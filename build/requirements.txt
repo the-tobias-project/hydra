@@ -1,5 +1,6 @@
 billiard==3.5.0.4
 celery==4.2.1
+werkzeug==0.16.1
 connexion==2.2.0
 csvkit==1.0.3
 Cython==0.28.2

@@ -1,6 +1,8 @@
 # HyDRA
 Software for decentralized GWAS
 
+HyDRA is on the cloud! Visit [the cloud instructions](https://github.com/guardian-network/hydra/tree/cloud). 
+
 ## Tutorial  
 
 The easiest way to familiarize yourself with the pipeline is following this short [example](https://github.com/apoursh/HyDRA/tree/master/example) file. The example will walk through the setup and a mock GWAS using publicly available 1K genomes data.

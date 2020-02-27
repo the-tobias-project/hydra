@@ -204,7 +204,7 @@ def hess(C, M, n, m, rho):
 
 @nb.jit(nb.types.Tuple((nb.f8[:,:], nb.f8[:,:], nb.f8[:,:], nb.f8))(nb.f8[:,:], nb.f8[:], nb.i8, nb.i8, nb.f8),
     locals={'i': nb.i4, 'l': nb.i4, 'val': nb.f8, 'H': nb.f8[:,:], 'M': nb.f8[:], 'logitECX': nb.f8[:], 'eCx': nb.f8[:]},
-    cache=True, nopython=True, fastmath={'fast'})
+    cache=True, nopython=True, fastmath={"fast"})
 def ltri_Hessians(C, x, n, m, rho):
     eCx = exp(dot(C,x))
     f = sum(log1p(eCx)) #+ rho * 0.5 * umr_sum(mul(v,v), None, None, None, False)
