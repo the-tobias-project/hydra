@@ -253,7 +253,19 @@
           "type": "DockerExtension",
           "typeHandlerVersion": "1.0",
           "autoUpgradeMinorVersion": true,
-          "settings": {}
+          "settings": {
+            "compose": {
+              "hydra": {
+                "image": "apoursh/hydra:0.1",
+                "ports": [
+                  "9001:9001"
+                ],
+                "links": [
+                  "hydra:hydra"
+                ]
+              }
+            }
+          }
         }
       },
       {
