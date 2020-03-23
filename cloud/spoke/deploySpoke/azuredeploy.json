@@ -256,7 +256,7 @@
           "settings": {
             "compose": {
               "hydra": {
-                "image": "apoursh/hydra:0.1",
+                "image": "apoursh/hydra",
                 "ports": [
                   "9001:9001"
                 ],
