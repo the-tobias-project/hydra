@@ -1,0 +1,9 @@
+{
+    "$schema": "https://aka.ms/azure-quickstart-templates-metadata-schema#",
+    "type": "QuickStart",
+    "itemDisplayName": "Deploy an Ubuntu VM with Docker and Azure Data Lake Storage",
+    "description": "This template allows you to deploy an Ubuntu VM with Docker (using the Docker Extension) and Azure Data Lake Storage. You can later SSH into the VM and run Docker containers.",
+    "summary": "This deploys an Ubuntu VM with Docker and Azure Data Lake Storage",
+    "githubUsername": "apoursh",
+    "dateUpdated": "2020-02-26"
+  }
