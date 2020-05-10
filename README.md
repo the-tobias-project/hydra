@@ -33,7 +33,7 @@ root@hydra:/app#
 ```
 On the client side, you will need to start a redis network: `docker network create hydra-redis`
 
-### Build the image yourself
+### Build the image yourself 
 
 Instead of downloading the image, you can build the image from scratch. To run the setup first download the binary files (ending with `.so`) from [here](https://console.cloud.google.com/storage/browser/hydra-example-data) and place them in the `src/lib` directory. Then navigate to the software-home directory and run the following:
 
