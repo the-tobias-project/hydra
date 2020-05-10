@@ -8,7 +8,7 @@ The easiest way to familiarize yourself with the pipeline is following this shor
 
 ## Setup
 
-The recommended setup requires the following:
+The recommended setup requires the following: 
 
 * Docker (Version 2.0 or above) 
 * Bash
