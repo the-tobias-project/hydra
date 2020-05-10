@@ -35,4 +35,5 @@ jobs:
         echo test, and deploy your project.
   deploy: 
     needs: [build]
-    run: echo Finished build. Deploying.
+    steps: 
+      run: echo Finished build. Deploying.
