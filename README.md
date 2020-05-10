@@ -10,7 +10,7 @@ The easiest way to familiarize yourself with the pipeline is following this shor
 
 The recommended setup requires the following:
 
-* Docker (Version 2.0 or above)
+* Docker (Version 2.0 or above) 
 * Bash
 * An internet connection
 * The two ports `[9001, 9200]` open on your computer
