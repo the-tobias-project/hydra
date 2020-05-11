@@ -18,13 +18,13 @@ RUN mkdir /app/build
 RUN mkdir /app/scratch
 RUN mkdir /app/src
 
-ADD ./requirements.txt /app/build
+ADD build/requirements.txt /app/build
 ADD ./src/ /app/src
-ADD ./download1kG.sh /app/testData
-ADD ./compiler.py /app
-ADD ./corr.pyx /app
-ADD ./corr.cpp /app
-ADD ./plink2_stats.cpp /app
+#ADD build/download1kG.sh /app/testData
+ADD build/compiler.py /app
+ADD build/corr.pyx /app
+ADD build/corr.cpp /app
+ADD build/plink2_stats.cpp /app
 
 RUN pip install --trusted-host pypi.python.org -r /app/build/requirements.txt
 RUN conda install h5py==2.8.0 

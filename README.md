@@ -6,7 +6,7 @@ Software for decentralized GWAS
 The easiest way to familiarize yourself with the pipeline is following this short [example](https://github.com/apoursh/HyDRA/tree/master/example) file. The example will walk through the setup and a mock GWAS using publicly available 1K genomes data.
 
 
-## Setup
+## Setup 
 
 The recommended setup requires the following: 
 
