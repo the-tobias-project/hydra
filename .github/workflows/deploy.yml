@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Deploy
+name: Build and deploy from a container
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -9,6 +9,10 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+
+env: 
+  AZURE_WEBAPP_NAME: HydraNewbie
+  CONTAINER_REGISTRY: ${{ secrets.REGISTRY_USERNAME }}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -22,7 +26,7 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
     - name: Build the Docker image
-      run: docker build . --file build/Dockerfile --tag my-image-name:$(date +%s)
+      run: docker build . --file build/Dockerfile --tag apoursh/hydra:latest #$(date +%s)
 
     # Runs a single command using the runners shell
     #- name: Run a one-line script
@@ -33,10 +37,23 @@ jobs:
       run: 
         echo Add other actions to build,
         echo test, and deploy your project.
-  deploy: 
+
+  push: 
     runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v2
-      - name: test command 
-        run: echo Finished build. Deploying.
+    needs: build 
+    steps: 
+    - uses: actions/checkout@v2 
+    - name: Push to Dockerhub
+      run: docker push apoursh/hydra:latest
+
+      #  deploy: 
+      #    runs-on: ubuntu-latest
+      #    needs: build
+      #    steps:
+      #      - name: Azure authentication
+      #        uses: azure/login@v1
+      #        with: 
+      #          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #      - uses: actions/checkout@v2
+      #      - name: test command 
+      #        run: echo Finished build. Deploying.
