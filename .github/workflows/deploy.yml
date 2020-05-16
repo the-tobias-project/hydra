@@ -36,9 +36,10 @@ jobs:
     - name: Push to Dockerhub
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
-        name: apoursh/hydra:latest
+        name: apoursh/hydra
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
+        tags: "latest"
 
       #  deploy: 
       #    runs-on: ubuntu-latest
