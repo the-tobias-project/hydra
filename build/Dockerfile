@@ -9,8 +9,8 @@ RUN apt-get update && \
     apt-get install -y vim && \
     apt-get install -y man && \
 #    apt-get install -y plink1.9 && \
-    apt-get install -y --no-install-recommends openssh-server && \
-    ln -s /usr/bin/plink1.9 /usr/bin/plink
+    apt-get install -y --no-install-recommends openssh-server 
+#    ln -s /usr/bin/plink1.9 /usr/bin/plink
 
 WORKDIR /app
 
