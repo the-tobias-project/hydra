@@ -7,7 +7,7 @@ Cython==0.28.2
 flask==1.0.2
 h5py==2.8.0
 jsonschema==2.6.0
-numba==0.40.0
+numba==0.47.0
 numpy==1.15.2
 pandas==0.24.1
 plinkio==0.9.6
