@@ -30,3 +30,6 @@ ADD build/plink2_stats.cpp /app
 
 RUN pip install --trusted-host pypi.python.org -r /app/build/requirements.txt
 RUN conda install h5py==2.8.0 
+ENV SSH_PASSWD "root:Docker!"
+RUN chmod u+x /app/build/init.sh
+ENTRYPOINT ["/app/build/init.sh"]
