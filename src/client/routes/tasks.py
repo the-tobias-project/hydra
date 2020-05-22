@@ -12,6 +12,27 @@ from worker.tasks import celery as celery_client
 bp = Blueprint('root', __name__, url_prefix='/api')
 
 
+@bp.route('/echo', methods=['POST'])
+def echo():
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.echo',
+                            [app.config['client'], app.config["ENV"]],
+                            serializer='pickle',
+                            queue=client_name)
+    return networking.create_response(200)
+
+
+@bp.route('/End_echo', methods=['POST'])
+def end_echo():
+    client_name = app.config['client']['name']
+    celery_client.send_task('tasks.end_echo',
+                            [request.data,app.config['client'], app.config["ENV"]],
+                            serializer='pickle',
+                            queue=client_name)
+    return networking.create_response(200)
+
+
+
 @bp.route('/init', methods=['POST'])
 def init():
     logging.info('Got command to initialize')

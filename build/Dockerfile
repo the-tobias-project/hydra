@@ -21,7 +21,7 @@ RUN mkdir /app/src
 
 ADD build/init.sh /app/build
 ADD build/requirements.txt /app/build
-ADD build/src/ /app/src
+ADD src/ /app/src
 #ADD build/download1kG.sh /app/testData
 ADD build/compiler.py /app
 ADD build/corr.pyx /app

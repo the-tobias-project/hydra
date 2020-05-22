@@ -97,6 +97,7 @@ paths:
           required: true
           type: string
           enum:
+            - ECHO
             - INIT
             - QC
             - PCA
@@ -124,6 +125,7 @@ paths:
           required: true
           type: string
           enum:
+            - ECHO
             - INIT
             - QC
             - PCA

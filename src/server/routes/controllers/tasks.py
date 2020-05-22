@@ -60,6 +60,10 @@ def start_task(task_name):
         args["ASSO_PCS"] = args.get("ASSO_PCS", Thresholds.ASSO_pcs)
         logging.info("Starting Associations")
         task_ass.LogisticAdmm.get_instance(args, active=2)
+    
+    elif task_name == Commands.ECHO:
+        counts = args.get("ECHO_COUNTS", Thresholds.ECHO_COUNTS)
+        echo = task_init.Echo.get_instance(counts)
 
     return networking.create_response(200, f'Started task {task_name}')
 
@@ -106,6 +110,13 @@ def start_subtask(task_name, subtask_name, client_name):
                 ass_agg.newton_iter(model)
         elif subtask_name == "valback":
             ass_agg.collect_likelihoods(request.data)
+    elif task_name == Commands.ECHO:
+        if subtask_name == "ITR":
+            echo = task_init.Echo.get_instance(1)
+            echo.echo(client_name)
+            avg_t = echo.echo(client_name)
+            if avg_t is not None:
+                logging.info(f"Avg echo time={avg_t}")
 
     return networking.create_response(200)
 

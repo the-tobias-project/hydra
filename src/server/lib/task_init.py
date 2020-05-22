@@ -21,6 +21,41 @@ from server.lib import plots
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
 
+class Echo(object):
+    __instance = None
+
+    def __init__(self, count):
+        if Echo.__instance is not None:
+            return
+        else:
+            Echo.count = count
+            Echo.t = time.time()
+            Echo.echos_left = count
+            Echo.__instance = self
+            networking.message_clients("echo", env=app.config["ENV"])
+    
+    @staticmethod
+    def get_instance(count):
+        if Echo.__instance is None: 
+            Echo(count)
+        return Echo.__instance
+
+    def echo(self, client_name):
+        instances = Registry.get_instance()
+        instances.set_client_state(client_name, Commands.ECHO)
+        if instances.num_clients_in_state(Commands.ECHO) == len(instances):
+            Echo.echos_left -= 1
+            for client in instances.list_clients():
+                instances.set_client_state(client["name"], None)
+        if not Echo.echos_left:
+            Echo.__instance = None # remove the instance (essentially)
+            avg_t = (time.time() - Echo.t)/ Echo.count
+            networking.message_clients("End_echo", env=app.config["ENV"], data=avg_t)
+            return avg_t
+        else:
+            networking.message_clients("echo", env=app.config["ENV"])
+        return None
+
 
 def start_init_task():
     global TIME

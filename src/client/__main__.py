@@ -37,7 +37,7 @@ class BaseURL(object):
         if is_dev_env:
             self.url = f'http://{server_host}:{server_port}/api'
         else:
-            self.url = f'https://{server_host}:{server_port}/api'
+            self.url = f'https://{server_host}/api'
         BaseURL.__instance = self
 
 

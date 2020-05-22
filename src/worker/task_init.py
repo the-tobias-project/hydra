@@ -21,6 +21,12 @@ from lib.corr import process_plink_row
 logger = logging.getLogger("worker")
 
 
+def echo(client_config, env):
+    networking.respond_to_server('api/tasks/Echo/itr', 'POST', env)
+    
+def end_echo(avg_t, client_config, env):
+    logger.info(f"Average back and forward echo time: {avg_t}")
+
 def init_store(client_config, env):
     pfile = client_config['plinkfile']
     store_name = shared.get_plink_store(pfile)

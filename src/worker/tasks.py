@@ -17,10 +17,13 @@ sys.path.append(os.path.abspath('../client'))
 logger = logging.getLogger("worker")
 
 
-@celery.task(name='tasks.hello')
-def hello():
-    return 'hello world'
+@celery.task(name='tasks.echo')
+def echo(client_config, env):
+    task_init.echo(client_config, env)
 
+@celery.task(name='tasks.end_echo')
+def end_echo(data, client_config, env):
+    task_init.end_echo(data,client_config, env)
 
 @celery.task(name='tasks.caller')
 def caller(fn, a, b):
