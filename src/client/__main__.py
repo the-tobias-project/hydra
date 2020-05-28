@@ -5,6 +5,7 @@ import logging.config
 import signal
 import sys
 import os
+import time 
 
 # third party lib
 import requests
@@ -167,6 +168,16 @@ def main():
     if not register_self(client, server_url):
         logging.error('Could not register self with server, exiting...')
         sys.exit(1)
+    # Get echo speed
+    n_echo = 20
+    t = time.time()
+    for i in range(n_echo):
+        url = f'{server_url}/clients'
+        registered_clients = requests.get(url).json()
+    logging.info(f"{n_echo} echos took {time.time() - t}s")
+
+
+
 
     app.run(host=client['listen_host'], port=client['port'], threaded=False)
 

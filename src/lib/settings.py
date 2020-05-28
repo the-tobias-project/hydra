@@ -99,7 +99,7 @@ class PCAFilterNames(object):
 
 class ServerHTTP(object):
     listen_host = '0.0.0.0'
-    external_host = 'hydraapp.azurewebsites.net'
+    external_host = "localhost"#'hydraapp.azurewebsites.net'
     port = '9001'
     max_content_length = 1024 * 1024 * 1024  # 1 GB
     wait_time = 0.5  # for the time.sleep() hacks
@@ -108,7 +108,7 @@ class ServerHTTP(object):
 class ClientHTTP(object):
     default_max_content_length = 1024 * 1024 * 1024  # 1 GB
     default_listen_host = '0.0.0.0'
-    default_external_host = 'hydraapp.azurewebsites.net'
+    default_external_host = "localhost"#'hydraapp.azurewebsites.net'
     clients = [{
             'name': 'Center1',
             'listen_host': default_listen_host,

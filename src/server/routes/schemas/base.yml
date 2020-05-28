@@ -85,6 +85,13 @@ paths:
       responses:
         200:
           description: Successfully retrieved list of available tasks
+  /process/info:
+    get:
+      summary: Get the parameters for the next step
+      operationId: server.routes.controllers.tasks.next_task
+      responses:
+        200:
+          description: Succesfully provided next step instructions
   /tasks/{task_name}:
     post:
       tags:

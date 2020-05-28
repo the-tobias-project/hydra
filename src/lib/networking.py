@@ -1,6 +1,7 @@
 # third party lib
 from flask import jsonify, make_response
 import requests
+import time
 
 # internal lib
 from lib.settings import ServerHTTP
@@ -47,6 +48,20 @@ def get_protocol(env='production'):
     if env == 'development':
         return 'http'
     return 'https'
+
+
+def ask_til_answered(path, verb, gap, msg=None, env="production"):
+    answered = False
+    client = Registry.get_instance().list_clients()[1]
+    url = f"{env}://{ServerHTTP.external_host}:{ServerHTTP.port}/process/info"
+    while not answered:
+        try: 
+            response = requests.get(url).json()
+            answered = True
+        except Exception as e:
+            logging.error("Error getting results")
+            logging.error(e)
+    return response
 
 
 def message_clients(address, client_name=None, args=None, env='production', data=None):

@@ -21,12 +21,14 @@ def list_tasks():
 
 def start_task(task_name):
     logging.info(f'Got command to start {task_name}, starting...')
+    tr = tasks.TaskReg.get_instance()
 
     args = {}
     for key, val in request.json.items():
         args[key.upper()] = val
 
     if task_name == Commands.INIT:
+        tr.set_up_task(task=Commands.INIT, subtask=None)
         task_init.start_init_task()
 
     elif task_name.startswith(Commands.QC):
@@ -125,3 +127,9 @@ def reset_states(state):
     instance = Registry.get_instance()
     for client in instance.list_clients():
         instance.set_client_state(client["name"], state)
+
+
+def next_task:
+    tsk = .get_instance()
+    msg = registry.list_clients() 
+    return networking.create_response(200, msg)

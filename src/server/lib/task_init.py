@@ -21,6 +21,7 @@ from server.lib import plots
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
 
+
 class Echo(object):
     __instance = None
 

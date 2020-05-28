@@ -13,6 +13,7 @@ from flask import current_app
 
 # Internal lib
 from lib import settings
+from lib import TaskReg
 from lib.logging_config import return_config
 
 
@@ -105,6 +106,7 @@ def main():
     app.app.config['server'] = server  # Store configuration for later use
     if args.dev:
         app.app.config['ENV'] = 'development'
+    TaskReg.get_instance()
 
     app.run(host=server['listen_host'], port=server['port'], threaded=False)
 
