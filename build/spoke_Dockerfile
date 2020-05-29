@@ -20,7 +20,7 @@ RUN mkdir /app/scratch
 RUN mkdir /app/src
 
 ADD build/requirements.txt /app/build
-ADD ./src/ /app/src
+ADD src/ /app/src
 ADD build/compiler.py /app
 ADD build/corr.pyx /app
 ADD build/corr.cpp /app

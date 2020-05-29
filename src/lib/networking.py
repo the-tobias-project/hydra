@@ -6,6 +6,7 @@ import time
 # internal lib
 from lib.settings import ServerHTTP
 from lib.client_registry import Registry
+from client.routes.dispatcher import dispatcher
 
 
 def create_response(code, msg=None):
@@ -50,30 +51,44 @@ def get_protocol(env='production'):
     return 'https'
 
 
-def ask_til_answered(path, verb, gap, msg=None, env="production"):
+def ask_til_answered(gap=5, msg=None, env="production"):
+    def ready(msg):
+        if "task" not in msg:
+            print("waiting")
+            return False
+        return True
+
     answered = False
-    client = Registry.get_instance().list_clients()[1]
-    url = f"{env}://{ServerHTTP.external_host}:{ServerHTTP.port}/process/info"
+    #client = Registry.get_instance().list_clients()[1]
+    if env == "production":
+        url = f"{get_protocol(env)}://{ServerHTTP.external_host}/api/process/info"
+    else:
+        url = f"{get_protocol(env)}://{ServerHTTP.external_host}:{ServerHTTP.port}/api/process/info"
     while not answered:
         try: 
             response = requests.get(url).json()
-            answered = True
+            dispatcher(response["msg"]["task"])
+            answered = ready(response["msg"])
         except Exception as e:
-            logging.error("Error getting results")
-            logging.error(e)
+            print(e)
+            #logging.error("Error getting results")
+            #logging.error(e)
+        time.sleep(gap)
+
     return response
 
 
 def message_clients(address, client_name=None, args=None, env='production', data=None):
-    clients = Registry.get_instance().list_clients()
-    if client_name is None:
-        client_list = clients
-    else:
-        client_list = list(filter(lambda x: x["name"] == client_name, clients))
-    for client in client_list:
-        if args is None:
-            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}',
-                          data=data)
-        else:
-            requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}',
-                          params=args, data=data)
+    pass
+    #clients = Registry.get_instance().list_clients()
+    #if client_name is None:
+    #    client_list = clients
+    #else:
+    #    client_list = list(filter(lambda x: x["name"] == client_name, clients))
+    #for client in client_list:
+    #    if args is None:
+    #        requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}',
+    #                      data=data)
+    #    else:
+    #        requests.post(f'{get_protocol(env)}://{client["external_host"]}:{client["port"]}/api/{address}',
+    #                      params=args, data=data)

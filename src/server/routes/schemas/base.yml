@@ -87,6 +87,8 @@ paths:
           description: Successfully retrieved list of available tasks
   /process/info:
     get:
+      tags:
+        - Defaults
       summary: Get the parameters for the next step
       operationId: server.routes.controllers.tasks.next_task
       responses:
@@ -104,7 +106,6 @@ paths:
           required: true
           type: string
           enum:
-            - ECHO
             - INIT
             - QC
             - PCA
@@ -132,7 +133,6 @@ paths:
           required: true
           type: string
           enum:
-            - ECHO
             - INIT
             - QC
             - PCA

@@ -16,6 +16,7 @@ from lib import settings
 import worker
 from worker import factory
 from lib.logging_config import return_client_config
+from lib.networking import ask_til_answered
 
 # Routes
 
@@ -176,10 +177,8 @@ def main():
         registered_clients = requests.get(url).json()
     logging.info(f"{n_echo} echos took {time.time() - t}s")
 
-
-
-
-    app.run(host=client['listen_host'], port=client['port'], threaded=False)
+    #app.run(host=client['listen_host'], port=client['port'], threaded=False)
+    ask_til_answered()
 
 
 if __name__ == '__main__':

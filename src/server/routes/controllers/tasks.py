@@ -129,7 +129,7 @@ def reset_states(state):
         instance.set_client_state(client["name"], state)
 
 
-def next_task:
-    tsk = .get_instance()
-    msg = registry.list_clients() 
+def next_task():
+    tsk = tasks.TaskReg.get_instance()
+    msg = tsk.get_up_task()
     return networking.create_response(200, msg)

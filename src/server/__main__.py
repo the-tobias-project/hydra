@@ -13,7 +13,7 @@ from flask import current_app
 
 # Internal lib
 from lib import settings
-from lib import TaskReg
+from lib.tasks import TaskReg
 from lib.logging_config import return_config
 
 

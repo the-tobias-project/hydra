@@ -9,6 +9,7 @@ class TaskReg(object):
     """
     Singleton, keeps track of what task is ahead
     """
+    __instance = None
     @staticmethod 
     def get_instance():
         if TaskReg.__instance is None:
