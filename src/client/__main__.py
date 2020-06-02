@@ -4,7 +4,7 @@ import logging
 import logging.config
 import signal
 import sys
-import os
+import os, pdb
 import time 
 
 # third party lib
@@ -154,8 +154,8 @@ def main():
     # Overrides
     client = configure_client(client, args)
 
-    app.config['MAX_CONTENT_LENGTH'] = client['max_content_length']
-    app.config['client'] = client  # Store configuration for later use
+    #app.config['MAX_CONTENT_LENGTH'] = client['max_content_length'] # App no longer exists
+    #app.config['client'] = client  # Store configuration for later use
     if args.dev:
         app.config['ENV'] = 'development'
 
@@ -169,16 +169,16 @@ def main():
     if not register_self(client, server_url):
         logging.error('Could not register self with server, exiting...')
         sys.exit(1)
-    # Get echo speed
-    n_echo = 20
-    t = time.time()
-    for i in range(n_echo):
-        url = f'{server_url}/clients'
-        registered_clients = requests.get(url).json()
-    logging.info(f"{n_echo} echos took {time.time() - t}s")
+    ## Get echo speed
+    #n_echo = 20
+    #t = time.time()
+    #for i in range(n_echo):
+    #    url = f'{server_url}/clients'
+    #    registered_clients = requests.get(url).json()
+    #logging.info(f"{n_echo} echos took {time.time() - t}s")
 
     #app.run(host=client['listen_host'], port=client['port'], threaded=False)
-    ask_til_answered()
+    ask_til_answered(client)
 
 
 if __name__ == '__main__':

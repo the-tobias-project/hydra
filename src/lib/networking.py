@@ -38,7 +38,11 @@ def create_response(code, msg=None):
 
 
 def respond_to_server(path, verb, msg=None, client_name=None, env='production'):
-    url = f'{get_protocol(env)}://{ServerHTTP.external_host}:{ServerHTTP.port}/{path}'
+    if env == "production":
+        url = f'{get_protocol(env)}://{ServerHTTP.external_host}/{path}'
+    else:
+        url = f'{get_protocol(env)}://{ServerHTTP.external_host}:{ServerHTTP.port}/{path}'
+    print(url)
     s = requests.Session()
     req = requests.Request(method=verb, url=url, data=msg, params={'client_name': client_name})
     prepped = req.prepare()
@@ -46,16 +50,21 @@ def respond_to_server(path, verb, msg=None, client_name=None, env='production'):
 
 
 def get_protocol(env='production'):
+
     if env == 'development':
         return 'http'
     return 'https'
 
 
-def ask_til_answered(gap=5, msg=None, env="production"):
+def ask_til_answered(client, gap=5, msg=None, env="production"):
+    sleep_t = gap
+    tasks_so_far = [None]
     def ready(msg):
         if "task" not in msg:
-            print("waiting")
             return False
+        elif msg["task"] == tasks_so_far[-1]:
+            return False
+        tasks_so_far.append(msg["task"])
         return True
 
     answered = False
@@ -67,13 +76,17 @@ def ask_til_answered(gap=5, msg=None, env="production"):
     while not answered:
         try: 
             response = requests.get(url).json()
-            dispatcher(response["msg"]["task"])
-            answered = ready(response["msg"])
+            new_task = ready(response["msg"])
+            if new_task:
+                dispatcher(response["msg"]["task"], client, env)
+                sleep_t = gap
+            else: 
+                sleep_t == min(2*sleep_t, 60)
         except Exception as e:
             print(e)
             #logging.error("Error getting results")
             #logging.error(e)
-        time.sleep(gap)
+        time.sleep(sleep_t)
 
     return response
 

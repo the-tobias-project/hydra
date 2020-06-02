@@ -8,3 +8,4 @@ CELERY_ACCEPT_CONTENT = ["pickle"]
 BROKER_URL = Settings.redis_uri
 BACKEND_URL = Settings.redis_uri
 CELERYD_HIJACK_ROOT_LOGGER = False
+CELERY_IMPORTS = ('worker.tasks')

@@ -176,6 +176,7 @@ def report_counts(client_config, env):
 
 def send_positions_to_server(positions, chrom, client_config, env):
     client_name = client_config['name']
+    print(chrom, client_config, env)
 
     data = pickle.dumps({
         'CHROM': chrom,
