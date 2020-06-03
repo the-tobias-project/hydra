@@ -8,7 +8,9 @@ The easiest way to familiarize yourself with the pipeline is following this shor
 
 ## Setup 
 
-The recommended setup requires the following: 
+HyDRA is consisted of two separate pieces. The server/hub and the client(s)/spoke(s). In this section, we explain how to setup either section. Most users will be interested in the spoke setup. 
+
+For both sections the recommended setup requires the following: 
 
 * Docker (Version 2.0 or above) 
 * Bash
@@ -16,23 +18,25 @@ The recommended setup requires the following:
 * The two ports `[9001, 9200]` open on your computer
 * The Docker network namespaces `[hydra-network, hydra_redis]` available
 
-### Download the image and run a container
-This may be the fastest way, given a good network connection between your machine and
-the docker hub:
+### Spoke 
+The Docker image can be downloaded or build from scratch. To download the image run:
+```
+docker pull apoursh/hydra:spoke
+```
+then run `bash up.sh`. This command will build the container if it has not been downloaded. 
 
-
+<!--
 Server side: 
-1. `docker pull apoursh/hydra:0.1`
+1. `docker pull apoursh/hydra:spoke`
 2. `docker run --name hydra -p 9001:9001 --hostname hydra -it apoursh/hydra:0.1 bash`
-
+-->
 
 You should find yourself inside the docker container with a prompt that looks like this:
 
 ```bash
 root@hydra:/app#
 ```
-On the client side, you will need to start a redis network: `docker network create hydra-redis`
-
+<!--
 ### Build the image yourself 
 
 Instead of downloading the image, you can build the image from scratch. To run the setup first download the binary files (ending with `.so`) from [here](https://console.cloud.google.com/storage/browser/hydra-example-data) and place them in the `src/lib` directory. Then navigate to the software-home directory and run the following:
@@ -46,13 +50,18 @@ This will build your image to include all necessary libraries and runtime requir
 ```bash
 root@hydra:/app#
 ```
+-->
 
-Note that this step is the same for all users (server and centers). Additionally, if you run `docker ps`from the host machine, you should see two new containers currently running - one
-for HyDRA itself (e.g. `hydra_app_1`), and one for the Redis instance associated with HyDRA (e.g. `hydra_redis_1`). 
+If you run `docker ps`from the host machine, you should see two new containers currently running - one
+for HyDRA itself (e.g. `Center`), and one for the Redis instance associated with HyDRA (e.g. `hydra_redis_1`). 
     
-We use Celery to manage client jobs, and Celery uses Redis as its communication backbone.
+We use Celery to manage client jobs, and Celery uses Redis as its communication backbone. Next we will setup the working queue.
 
-To run the experiments on your dataset, please follow the directions under [data prep](#data-prep-details)
+We will use the current window for running the spoke. Open another Terminal and start a session within the container
+
+```
+docker exec -it  Center bash
+```
 
 
 ## Running the server, client(s), and worker(s)

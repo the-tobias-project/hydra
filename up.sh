@@ -10,7 +10,7 @@ fi
 
 
 #cp testData/download1kG.sh build/
-#cp -r src build/
+cp -r src build/
 
 docker-compose -p hydra -f ./build/docker-compose.yml up -d
 

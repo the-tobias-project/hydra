@@ -1,26 +1,5 @@
 version: '3.7'
 services:
-  app:
-    hostname: hydra
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: bash
-    environment:
-      - CONFIG_PATH=/app/build/config.yml
-    ports:
-      - "9001:9001"
-    volumes:
-      - "..:/app:rw"
-      - "/scratch"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    tty: true
-    stdin_open: true
-    working_dir: /app
-    networks:
-     hydra-network:
-       aliases:
-         - hydra_network
   redis:
     image: redis:5.0.4
     ports:
@@ -34,7 +13,8 @@ services:
     hostname: hydra-client
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: spoke_Dockerfile
+    image: apoursh/hydra:spoke
     command: bash
     environment:
       - CONFIG_PATH=/app/build/config.yml

@@ -6,4 +6,4 @@ if [[ "$(docker network inspect hydra-client --format "{{range .Containers}}T{{e
 	docker network rm hydra-network
 fi
 
-docker rmi hydra_app
+docker rmi apoursh/hydra:spoke
