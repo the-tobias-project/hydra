@@ -57,80 +57,22 @@ for HyDRA itself (e.g. `Center`), and one for the Redis instance associated with
     
 We use Celery to manage client jobs, and Celery uses Redis as its communication backbone. Next we will setup the working queue.
 
-We will use the current window for running the spoke. Open another Terminal and start a session within the container
+We will use the current window for running the spoke but we will need another window to run the redis worker on. Open another terminal and connect to the container using the command:
 
 ```
 docker exec -it  Center bash
 ```
-
-
-## Running the server, client(s), and worker(s)
-
-To connect to a running docker container with a new terminal, assuming the container name is `hydra_app_1`, run:
-
-`docker exec -it hydra_app_1 bash`
-
-
-#### Running the server
-Prerequisites: None
-
-Running the server is as simple as connecting to the `hydra_app` container and executing the following commands:
-```bash
-cd /app/src
-python -m server
-```
-The response should look something like this:
-```bash
-root@hydra:/app# cd src
-root@hydra:/app/src# python -m server
- * Serving Flask app "__main__" (lazy loading)
- * Environment: production
-   WARNING: Do not use the development server in a production environment.
-   Use a production WSGI server instead.
- * Debug mode: off
-[INFO ] 2019-05-08 23:45:17,569 /usr/local/lib/python3.6/site-packages/werkzeug/_internal.py                     :: 122 =>  * Running on http://0.0.0.0:9001/ (Press CTRL+C to quit)
-```
-
-From here you can explore the API on a web browser on the same machine by visiting `http://localhost:9001/api/ui/`
-
-The server invoked without any arguments assumes the default configuration inside [`src/lib/settings.py`](src/lib/settings.py).
-These defaults can be overriden by either modifying that file directly, or adding arguments to the command line invocation.
-Details can be accessed by calling `python -m server --help`.
-
-#### Running the client
-Prerequisites: A running server
-
-On startup, the client registers itself with the server - hence the dependency on a running server.  The
-server uses this registration to later send out further tasks to each individual client.  On
-client SIGTERM or SIGINT, (e.g. `control + c`) it will attempt to unregister itself from the server.
-
-Starting the client also requires some configuration - For all examples, we assume the client name is `Center1`:
+change directory to the src directory `cd src` and start the worker: 
 
 ```bash
 cd /app/src
-python -m client --name=Center1 --plinkfile=/app/testData/dset1 
-```
-
-This barebones call assumes the defaults inside [`src/lib/settings.py`](src/lib/settings.py), which can be overwritten
-either by the modifying the file, or on the command-line invocation.  Call `python -m client --help` for details.
-
-
-#### Running the worker
-Prerequisites: None
-
-The worker needs to be associated with the client it's serving - this is done by giving both the same
-name.  Here we assume the name is `Center1`, which is within the list of clients inside 
-[`src/lib/settings.py::ClientHTTP`](src/lib/settings.py).  Any modifications should be reflected within that class.
-
-```bash
-cd /app/src
-C_FORCE_ROOT=1 celery -A worker worker -Q Center1 -n Center1 --concurrency=1
+C_FORCE_ROOT=1 celery -A worker worker -Q Center -n Center --concurrency=1
 ```
 
 Which results in something like this:
 
 ```bash
-root@hydra:/app/src# C_FORCE_ROOT=1 celery -A worker worker -Q BioME -n BioME --concurrency=1
+root@hydra:/app/src# C_FORCE_ROOT=1 celery -A worker worker -Q Center1 -n Center1 --concurrency=1
 /usr/local/lib/python3.6/site-packages/celery/platforms.py:796: RuntimeWarning: You're running the worker with superuser privileges: this is
 absolutely not recommended!
 
@@ -140,7 +82,7 @@ User information: uid=0 euid=0 gid=0 egid=0
 
   uid=uid, euid=euid, gid=gid, egid=egid,
 
- -------------- celery@BioME v4.2.1 (windowlicker)
+ -------------- celery@Center1 v4.2.1 (windowlicker)
 ---- **** -----
 --- * ***  * -- Linux-4.9.125-linuxkit-x86_64-with-debian-9.9 2019-05-08 23:45:30
 -- * - **** ---
@@ -152,41 +94,53 @@ User information: uid=0 euid=0 gid=0 egid=0
 -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
 --- ***** -----
  -------------- [queues]
-                .> BioME            exchange=BioME(direct) key=BioME
+                .> Center1            exchange=Center(direct) key=Center1
 ```
 Because we are running inside a sandboxed Docker environment, we can safely ignore the superuser warning.
 
+Now we are ready to run the spoke (client)
 
-#### Creating a distributed system
-An example client docker container is created from the `build/docker-compose.yml` file with service name `client`.  This
-client will communicate to the server over the docker network called `hydra_network`, thus allowing one to create two
-completely separate containers on the same physical machine.
+On startup, the client registers itself with the server. On
+client SIGTERM or SIGINT, (e.g. `control + c`) it will attempt to unregister itself from the server.
 
-Of course, outside of a testing environment like the one just described, you can simply specify the IP addresses of
-each host.
-
-To connect to the client, first run `docker ps`, then use that output to attach to the client container.  In the
-following example, we will assume the server has already been started:
+Starting the client also requires some configuration - For all examples, we assume the client name is `Center1`:
 
 ```bash
-> docker ps
-CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                              NAMES
-68996b2109cf        hydra_app           "bash"                   7 minutes ago       Up 7 minutes        0.0.0.0:9001->9001/tcp             hydra_app_1
-53fd6c270431        hydra_client        "bash"                   7 minutes ago       Up 3 seconds                                           hydra_client_1
-
-> docker attach hydra_client_1
-root@hydra-client:/app# curl hydra_network:9001
-{
-  "detail": "The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.",
-  "status": 404,
-  "title": "Not Found",
-  "type": "about:blank"
-}
+cd /app/src
+python -m client --name=Center1 --plinkfile=/app/testData/dset1 
 ```
 
-The `404` message above is success - it shows we can connect to the server!  For testing purposes, you can add
-additional services under the `build/docker-compose.yml` file, or create separate docker containers from the base image;
-the implementation is left as an exercise to the reader.
+This barebones call assumes the defaults inside [`src/lib/settings.py`](src/lib/settings.py), which can be overwritten
+either by directly modifying the file, or on the command-line invocation.  Call `python -m client --help` for details.
+
+
+### Hub
+
+The study organizer (/organization) will need to setup the hub. Below are the instructions for setting up the hub using Azure App Services. 
+
+First, set the default parameters in [`src/lib/settings.py`](src/lib/settings.py). The `external_host` variable corresponds to the name of the app website. 
+
+Next, build the app image file and push to dockerhub:
+
+```
+docker build . --file build/Dockerfile --tag <dockerhub/name:hub>
+docker push <dockerhub/name:hub>
+```
+
+Our image can be found at `apoursh/hydra:hub`
+
+To implement the image as an app, log into your Azure account and open an Azure Cloud Shell terminal. 
+
+I assume a resource group `RG` has been made for this app. 
+
+```
+az appservice plan create --name hydraAppService --resource-group RG --sku <B1> --is-linux
+az webapp create --resource-group RG --plan hydraAppService  --name hydraapp --deployment-container-image-name <dockerhub/name:hub>
+az webapp config appsettings set --resource-group RG --name hydraapp --settings WEBSITES_PORT=9001
+```
+The first line creates an app service plan. In this example I have used a B1 plan but you can scale that to your needs. The second line deploys the app and the last line configures the app service to use the port 9001 for the website (this was set in `ServerHTTP` class of [`src/lib/settings.py`](src/lib/settings.py). the names `hydraAppService, hydraapp` can be changed as desired. 
+
+It will take a few minutes for the container to download. When ready the server can be accessed at `https://hydraapp.azurewebsites.net/api/ui` (replace hydraapp with the name you had chosen). 
 
 ## Performing a GWAS
 We will start with an overview of the state machine:
@@ -212,6 +166,42 @@ We will start with an overview of the state machine:
 |          |          |           |          |           |
 +----------+          +-----------+          +-----------+
 ```
+
+
+
+<!---
+## Below is depricated
+#### Creating a distributed system
+An example client docker container is created from the `build/docker-compose.yml` file with service name `client`.  This
+client will communicate to the server over the docker network called `hydra_network`, thus allowing one to create two
+completely separate containers on the same physical machine.
+
+Of course, outside of a testing environment like the one just described, you can simply specify the IP addresses of
+each host.
+
+To connect to the client, first run `docker ps`, then use that output to attach to the client container.  In the
+following example, we will assume the server has already been started:
+-->
+<!--
+```bash
+> docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                              NAMES
+68996b2109cf        hydra_app           "bash"                   7 minutes ago       Up 7 minutes        0.0.0.0:9001->9001/tcp             hydra_app_1
+53fd6c270431        hydra_client        "bash"                   7 minutes ago       Up 3 seconds                                           hydra_client_1
+
+> docker attach hydra_client_1
+root@hydra-client:/app# curl hydra_network:9001
+{
+  "detail": "The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.",
+  "status": 404,
+  "title": "Not Found",
+  "type": "about:blank"
+}
+```
+
+The `404` message above is success - it shows we can connect to the server!  For testing purposes, you can add
+additional services under the `build/docker-compose.yml` file, or create separate docker containers from the base image;
+the implementation is left as an exercise to the reader.
 
 Assuming you want `N` clients, once you see that the server has `N` clients registered,
 you will need to sequentially start the tasks `[init, qc, pca, asso]`:
@@ -343,7 +333,6 @@ Homer-like attacks by the server. If the server cannot be trusted encryption bas
 [this work](https://github.com/hhcho/secure-gwas) are more appropriate. 
 
 
-<!---
 1.  Issues with `lib.corr`
 
     You can attempt a recompile from within the `build/` directory with the following:
