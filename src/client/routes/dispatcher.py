@@ -34,13 +34,22 @@ def dispatch_on_task(func):
     return wrapper
 
 @dispatch_on_task
-def dispatcher(task):
+def dispatcher(task, *args):
     pass
         
 
 
-@dispatcher.register("INIT")
+@dispatcher.register(("INIT", "start"))
 def init(task, client, env, *args, **kw):
     logging.info('Got command to initialize')
     celery_client.send_task('tasks.init_store', [client, env],
             serializer='pickle', queue=client["name"])
+
+
+@dispatcher.register(("INIT", "stats"))
+def store_counts(task, client, env, *args, **kw):
+    logging.info('Got command to store initialized stats')
+    celery_client.send_task('tasks.init_stats',
+                            [args[0], client, env],
+                            serializer='pickle',
+                            queue=client["name"])

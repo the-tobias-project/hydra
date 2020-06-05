@@ -1,24 +1,24 @@
 # Directory structure
 
-├── client
-│   ├── __pycache__
-│   ├── lib
-│   │   └── __pycache__
-│   └── routes
-│       └── __pycache__
-├── lib
-│   └── __pycache__
-├── server
-│   ├── __pycache__
-│   ├── lib
-│   │   └── __pycache__
-│   └── routes
-│       ├── __pycache__
-│       ├── controllers
-│       │   └── __pycache__
-│       └── schemas
-└── worker
-    └── __pycache__
+├── client  
+│   ├── __pycache__  
+│   ├── lib  
+│   │   └── __pycache__  
+│   └── routes  
+│       └── __pycache__  
+├── lib  
+│   └── __pycache__  
+├── server  
+│   ├── __pycache__  
+│   ├── lib  
+│   │   └── __pycache__  
+│   └── routes  
+│       ├── __pycache__  
+│       ├── controllers  
+│       │   └── __pycache__  
+│       └── schemas  
+└── worker  
+    └── __pycache__  
 
 ## client
 

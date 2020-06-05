@@ -1,7 +1,7 @@
 # third party lib
 from flask import jsonify, make_response
 import requests
-import time
+import time, pdb
 
 # internal lib
 from lib.settings import ServerHTTP
@@ -42,7 +42,6 @@ def respond_to_server(path, verb, msg=None, client_name=None, env='production'):
         url = f'{get_protocol(env)}://{ServerHTTP.external_host}/{path}'
     else:
         url = f'{get_protocol(env)}://{ServerHTTP.external_host}:{ServerHTTP.port}/{path}'
-    print(url)
     s = requests.Session()
     req = requests.Request(method=verb, url=url, data=msg, params={'client_name': client_name})
     prepped = req.prepare()
@@ -60,11 +59,13 @@ def ask_til_answered(client, gap=5, msg=None, env="production"):
     sleep_t = gap
     tasks_so_far = [None]
     def ready(msg):
+        pdb.set_trace()
         if "task" not in msg:
             return False
-        elif msg["task"] == tasks_so_far[-1]:
+        task_id = (msg["task"], msg["subtask"])
+        if task_id == tasks_so_far[-1]:
             return False
-        tasks_so_far.append(msg["task"])
+        tasks_so_far.append(task_id)
         return True
 
     answered = False
@@ -76,9 +77,10 @@ def ask_til_answered(client, gap=5, msg=None, env="production"):
     while not answered:
         try: 
             response = requests.get(url).json()
-            new_task = ready(response["msg"])
+            msg = response["msg"]
+            new_task = ready(msg)
             if new_task:
-                dispatcher(response["msg"]["task"], client, env)
+                dispatcher((msg["task"], msg["subtask"]), client, env, msg["data"])
                 sleep_t = gap
             else: 
                 sleep_t == min(2*sleep_t, 60)
@@ -92,6 +94,7 @@ def ask_til_answered(client, gap=5, msg=None, env="production"):
 
 
 def message_clients(address, client_name=None, args=None, env='production', data=None):
+    """depricated. Uses http to connect to the clients"""
     pass
     #clients = Registry.get_instance().list_clients()
     #if client_name is None:

@@ -45,9 +45,9 @@ def clear_consistency_flag(fname):
     try:
         child_sig = subprocess.call([f"h5clear -s {fname}"], shell=True)
         if child_sig != 0:
-            child_sig("Consistency flag has not been cleared.", child_sig, file=sys.stderr)
+            logging.Error("Consistency flag has not been cleared.", child_sig, file=sys.stderr)
     except OSError as e:
-        logger.Error("Execution failed:", e, file=sys.stderr)
+        logger.Error("Clearing the hdf5 flag failed:", e, file=sys.stderr)
 
 
 def report_file_info(store_name, client_config, env):
@@ -176,7 +176,6 @@ def report_counts(client_config, env):
 
 def send_positions_to_server(positions, chrom, client_config, env):
     client_name = client_config['name']
-    print(chrom, client_config, env)
 
     data = pickle.dumps({
         'CHROM': chrom,
@@ -204,26 +203,26 @@ def init_stats(message, client_config, env):
             time.sleep(.1)
         else:
             break
-    message = pickle.loads(message)
+    #message = pickle.loads(message)
     chrom = message["CHROM"]
     logger.info(f'Computing statistics for Chrom: {chrom}.')
     pfile = client_config['plinkfile']
     with h5py.File(shared.get_plink_store(pfile), 'a') as store:
         chrom_group = store[str(chrom)]
         if "MISS" in message:
-            vals = message["MISS"]
+            vals = np.array(message["MISS"])
             task = "not_missing_per_snp"
             write_or_replace(chrom_group, task, val=1-vals)
         if "AF" in message:
-            vals = message["AF"]
+            vals = np.array(message["AF"])
             task = 'MAF'
             write_or_replace(chrom_group, task, val=vals)
         if "HWE" in message:
-            vals = message["HWE"]
+            vals = np.array(message["HWE"])
             task = "hwe"
             write_or_replace(chrom_group, task, val=vals)
         if "VAR" in message:
-            vals = message["VAR"]
+            vals = np.array(message["VAR"])
             task = "VAR"
             write_or_replace(chrom_group, task, val=vals)
     logging.info(f'Finished initializing QC statistics for chrom {chrom}.')

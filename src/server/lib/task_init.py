@@ -16,10 +16,12 @@ from lib.settings import Settings, Commands
 from lib.utils import write_or_replace
 from lib.client_registry import Registry
 from server.lib import plots
+from lib import tasks
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
 store = h5py.File(storePath, "a")
+TIME = time.time()
 
 
 class Echo(object):
@@ -61,9 +63,11 @@ class Echo(object):
 def start_init_task():
     global TIME
     TIME = time.time()
+    tr = tasks.TaskReg.get_instance()
+    tr.set_up_task(task=Commands.INIT, subtask="Start")
     for client in Registry.get_instance().list_clients():
         Registry.get_instance().set_client_state(client['name'], Commands.INIT)
-    networking.message_clients("init", env=app.config["ENV"])
+    #networking.message_clients("init", env=app.config["ENV"])
 
 
 def store_positions(data, client_name):
@@ -125,13 +129,15 @@ def count_stats():
             "TASK": task,
             "SUBTASK": "STATS",
             "CHROM": chrom,
-            "HWE": hwe,
-            "MISS": missing_rate,
-            "AF": af,
-            "VAR": var
+            "HWE": hwe.tolist(),
+            "MISS": missing_rate.tolist(),
+            "AF": af.tolist(),
+            "VAR": var.tolist()
         }
-        msg = pickle.dumps(msg)
-        networking.message_clients("init/stats", env=app.config["ENV"], data=msg)
+        #msg = pickle.dumps(msg)
+        tr = tasks.TaskReg.get_instance()
+        tr.set_up_task(task=Commands.INIT, subtask="stats", other={"data": msg})
+        #networking.message_clients("init/stats", env=app.config["ENV"], data=msg)
         store.create_dataset("{}/hwe".format(chrom), data=hwe)
     for client in clients:
         Registry.get_instance().set_client_state(client['name'], "DONE_INIT")

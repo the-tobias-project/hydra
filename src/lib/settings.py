@@ -99,7 +99,7 @@ class PCAFilterNames(object):
 external_host = "hydratest23.azurewebsites.net"
 class ServerHTTP(object):
     listen_host = '0.0.0.0'
-    external_host = external_host#'hydraapp.azurewebsites.net'#"localhost"#
+    external_host = external_host#"localhost"#external_host#'hydraapp.azurewebsites.net'#"localhost"#
     port = '9001'
     max_content_length = 1024 * 1024 * 1024  # 1 GB
     wait_time = 0.5  # for the time.sleep() hacks

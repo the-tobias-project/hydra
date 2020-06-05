@@ -21,14 +21,12 @@ def list_tasks():
 
 def start_task(task_name):
     logging.info(f'Got command to start {task_name}, starting...')
-    tr = tasks.TaskReg.get_instance()
-
     args = {}
+
     for key, val in request.json.items():
         args[key.upper()] = val
 
     if task_name == Commands.INIT:
-        tr.set_up_task(task=Commands.INIT, subtask=None)
         task_init.start_init_task()
 
     elif task_name.startswith(Commands.QC):
