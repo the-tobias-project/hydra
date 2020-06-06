@@ -39,7 +39,7 @@ def dispatcher(task, *args):
         
 
 
-@dispatcher.register(("INIT", "start"))
+@dispatcher.register(("INIT", "Start"))
 def init(task, client, env, *args, **kw):
     logging.info('Got command to initialize')
     celery_client.send_task('tasks.init_store', [client, env],

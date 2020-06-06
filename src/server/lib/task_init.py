@@ -109,6 +109,7 @@ def count_stats():
     N = float(store.attrs["N"])
     task = "INIT"
     clients = Registry.get_instance().list_clients()
+    msg = {}
     for chrom in store.keys():
         counts_dset = store["{}/counts".format(chrom)].value
         missing_rate = counts_dset[:, 3] / float(N)
@@ -125,20 +126,17 @@ def count_stats():
         store.create_dataset("{}/var".format(chrom), data=var)
         hwe = hweP(counts_dset[:, :3].astype(np.int32), 1, 0)
         # Need to Recompile HWEP with uint32
-        msg = {
-            "TASK": task,
-            "SUBTASK": "STATS",
-            "CHROM": chrom,
+        msg[f"{chrom}"] = {
             "HWE": hwe.tolist(),
             "MISS": missing_rate.tolist(),
             "AF": af.tolist(),
             "VAR": var.tolist()
         }
         #msg = pickle.dumps(msg)
-        tr = tasks.TaskReg.get_instance()
-        tr.set_up_task(task=Commands.INIT, subtask="stats", other={"data": msg})
         #networking.message_clients("init/stats", env=app.config["ENV"], data=msg)
         store.create_dataset("{}/hwe".format(chrom), data=hwe)
+    tr = tasks.TaskReg.get_instance()
+    tr.set_up_task(task=Commands.INIT, subtask="stats", other={"data": msg})
     for client in clients:
         Registry.get_instance().set_client_state(client['name'], "DONE_INIT")
 

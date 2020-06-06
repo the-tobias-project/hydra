@@ -191,7 +191,8 @@ def send_counts_to_server(data, client_config, env):
     networking.respond_to_server('api/tasks/INIT/COUNT', 'POST', data, client_name, env)
 
 
-def init_stats(message, client_config, env):
+def init_stats(msg_dict, client_config, env):
+    print(msg_dict.keys())
     # Wait on previous tasks to finish
     i = current_app.control.inspect()
     client_name = client_config['name']
@@ -204,29 +205,30 @@ def init_stats(message, client_config, env):
         else:
             break
     #message = pickle.loads(message)
-    chrom = message["CHROM"]
-    logger.info(f'Computing statistics for Chrom: {chrom}.')
     pfile = client_config['plinkfile']
+    #chrom = message["CHROM"]
     with h5py.File(shared.get_plink_store(pfile), 'a') as store:
-        chrom_group = store[str(chrom)]
-        if "MISS" in message:
-            vals = np.array(message["MISS"])
-            task = "not_missing_per_snp"
-            write_or_replace(chrom_group, task, val=1-vals)
-        if "AF" in message:
-            vals = np.array(message["AF"])
-            task = 'MAF'
-            write_or_replace(chrom_group, task, val=vals)
-        if "HWE" in message:
-            vals = np.array(message["HWE"])
-            task = "hwe"
-            write_or_replace(chrom_group, task, val=vals)
-        if "VAR" in message:
-            vals = np.array(message["VAR"])
-            task = "VAR"
-            write_or_replace(chrom_group, task, val=vals)
-    logging.info(f'Finished initializing QC statistics for chrom {chrom}.')
+        for chrom, message in msg_dict.items():
+            logger.info(f'Computing statistics for Chrom: {chrom}.')
+            chrom_group = store[chrom]
+            if "MISS" in message:
+                vals = np.array(message["MISS"])
+                task = "not_missing_per_snp"
+                write_or_replace(chrom_group, task, val=1-vals)
+            if "AF" in message:
+                vals = np.array(message["AF"])
+                task = 'MAF'
+                write_or_replace(chrom_group, task, val=vals)
+            if "HWE" in message:
+                vals = np.array(message["HWE"])
+                task = "hwe"
+                write_or_replace(chrom_group, task, val=vals)
+            if "VAR" in message:
+                vals = np.array(message["VAR"])
+                task = "VAR"
+                write_or_replace(chrom_group, task, val=vals)
+        logging.info(f'Finished initializing QC statistics for chrom {chrom}.')
 
     client_name = client_config['name']
-    status = f'Finished with init stats for chrom {chrom}.'
+    status = f'Finished with init stats.'
     networking.respond_to_server(f'api/clients/{client_name}/report?status={status}', 'POST', env=env)

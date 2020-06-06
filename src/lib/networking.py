@@ -59,7 +59,6 @@ def ask_til_answered(client, gap=5, msg=None, env="production"):
     sleep_t = gap
     tasks_so_far = [None]
     def ready(msg):
-        pdb.set_trace()
         if "task" not in msg:
             return False
         task_id = (msg["task"], msg["subtask"])
@@ -80,7 +79,7 @@ def ask_til_answered(client, gap=5, msg=None, env="production"):
             msg = response["msg"]
             new_task = ready(msg)
             if new_task:
-                dispatcher((msg["task"], msg["subtask"]), client, env, msg["data"])
+                dispatcher((msg["task"], msg["subtask"]), client, env, msg.get("data",None))
                 sleep_t = gap
             else: 
                 sleep_t == min(2*sleep_t, 60)

@@ -8,6 +8,7 @@ import time
 # third party lib
 import h5py
 import numpy as np
+from lib import networking
 from flask import current_app as app
 
 # internal lib
@@ -15,6 +16,7 @@ from lib.settings import Settings, Options, Commands
 from lib.client_registry import Registry
 from lib import networking
 from server.lib import task_init
+from lib import tasks
 
 
 storePath = os.path.join(Settings.local_scratch, "central.h5py")
@@ -53,8 +55,10 @@ def start_client_qc_task(filters, stage=Commands.QC):
         filters["mask_prefix"] = "QC"
     else:
         filters["mask_prefix"] = "PCA"
-    data = pickle.dumps(filters)
-    networking.message_clients("qc", data=data, env=app.config["ENV"])
+    #data = pickle.dumps(filters)
+    tr = tasks.TaskReg.get_instance()
+    tr.set_up_task(task=Commands.QC, subtask="start", other={"data": filters})
+    #networking.message_clients("qc", data=data, env=app.config["ENV"])
     for client in clients:
         Registry.get_instance().set_client_state(client['name'], stage)
 
