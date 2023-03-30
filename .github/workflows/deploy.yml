@@ -34,7 +34,7 @@ jobs:
     steps: 
     - uses: actions/checkout@v2 
     - name: Push to Dockerhub
-      uses: elgohr/Publish-Docker-Github-Action@master
+      uses: elgohr/Publish-Docker-Github-Action@v5
       with:
         name: apoursh/hydra
         username: ${{ secrets.DOCKER_USERNAME }}
