@@ -4,7 +4,7 @@ werkzeug==0.16.1
 connexion==2.2.0
 csvkit==1.0.3
 Cython==0.28.2
-flask==1.0.2
+flask==2.3.2
 h5py==2.8.0
 jsonschema==2.6.0
 matplotlib==3.1
